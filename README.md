@@ -4,18 +4,23 @@ Local MCP server + CLI for Tal x Dance architecture.
 Includes a workflow layer: `initialize -> recommend next combo -> set active combo -> run`.
 Open-source rollout plan: `OPEN_SOURCE_STRATEGY.md`.
 
-## Git setup
-Do not run `git init` at `dance-of-tal/` root.
-Run inside `mcp/` only:
+## Repo
+- MCP repo: `https://github.com/monarchjuno/dance-of-tal.git`
+- Web repo: `https://github.com/monarchjuno/dance-of-tal-web.git` (for GUI onboarding `/connect`)
+
+## Quick Start
 
 ```bash
-cd mcp
-git init
+git clone https://github.com/monarchjuno/dance-of-tal.git
+cd dance-of-tal
+npm install
+npm run build
+npx dot init --project . --target windsurf
+npx dot doctor --target windsurf
 ```
 
 ## Install and run
 ```bash
-cd mcp
 npm install
 npm run dev
 ```
@@ -35,7 +40,7 @@ dot --help
 ## dot setup flow
 Use `dot init` as the onboarding entrypoint for each project:
 
-If you prefer GUI onboarding, open front route: `/connect` (host selection + copy/paste config snippets).
+If you prefer GUI onboarding, open [`/connect`](https://dance-of-tal.vercel.app/connect) (host selection + copy/paste config snippets).
 
 ```bash
 # 1) interactive step-by-step setup (recommended)

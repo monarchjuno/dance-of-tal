@@ -6,10 +6,9 @@
   "author": "monarchjuno",
   "repository": {
     "type": "git",
-    "url": "https://github.com/monarchjuno/dance-of-tal.git",
-    "directory": "mcp"
+    "url": "https://github.com/monarchjuno/dance-of-tal.git"
   },
-  "homepage": "https://github.com/monarchjuno/dance-of-tal/tree/main/mcp",
+  "homepage": "https://github.com/monarchjuno/dance-of-tal",
   "bugs": {
     "url": "https://github.com/monarchjuno/dance-of-tal/issues"
   },
