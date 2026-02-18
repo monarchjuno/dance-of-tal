@@ -6,20 +6,20 @@ Open-source rollout plan: `OPEN_SOURCE_STRATEGY.md`.
 
 ## Repo
 - MCP repo: `https://github.com/monarchjuno/dance-of-tal.git`
-- npm package: `dance-of-tal-mcp`
+- npm package: `dance-of-tal`
 
 ## Quick Start
 
 ```bash
-npm install -g dance-of-tal-mcp
+npm install -g dance-of-tal
 dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
 dot doctor --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
 ```
 
 No global install mode:
 ```bash
-npx --yes --package dance-of-tal-mcp dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
-npx --yes --package dance-of-tal-mcp dot doctor --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
+npx --yes --package dance-of-tal dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
+npx --yes --package dance-of-tal dot doctor --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
 ```
 
 Starter prompt for AI hosts:
@@ -34,13 +34,13 @@ Set my Tal and Dance for [my goal]. Use preset first, then ask if I want custom 
 
 ## Install and run (package users)
 ```bash
-npm install -g dance-of-tal-mcp
+npm install -g dance-of-tal
 dot --help
 ```
 
 No global install mode:
 ```bash
-npx --yes --package dance-of-tal-mcp dot --help
+npx --yes --package dance-of-tal dot --help
 ```
 
 ## Install and run (local development)
@@ -195,7 +195,7 @@ Recommended for all hosts:
   "mcpServers": {
     "dance-of-tal": {
       "command": "npx",
-      "args": ["-y", "dance-of-tal-mcp"],
+      "args": ["-y", "dance-of-tal"],
       "env": {
         "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
       }
@@ -327,10 +327,10 @@ Suggested flow:
 
 ```bash
 # list available tools from this MCP server
-npx -y mcporter list --stdio "npx -y dance-of-tal-mcp" --schema
+npx -y mcporter list --stdio "npx -y dance-of-tal" --schema
 
 # generate OpenClaw profile payload
-npx -y mcporter call --stdio "npx -y dance-of-tal-mcp" \
+npx -y mcporter call --stdio "npx -y dance-of-tal" \
   build_openclaw_profile \
   talSlug="elon-musk-case-tal" \
   danceSlug="boardroom-brief" \

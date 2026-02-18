@@ -237,7 +237,7 @@ export const buildOpenClawProfile = ({
     profile: {
       id: profileId,
       name: profileName,
-      source: "dance-of-tal-mcp",
+      source: "dance-of-tal",
       tal: { slug: tal.slug, name: tal.name, category: tal.category },
       dance: { slug: dance.slug, name: dance.name, category: dance.category },
       systemPrompt,

@@ -201,7 +201,7 @@ const buildTargetSetup = (targetHost: InitTargetHost) => {
       steps: [
         "Open Windsurf MCP settings and register a local stdio server.",
         "Set command: npx",
-        "Set args: -y dance-of-tal-mcp",
+        "Set args: -y dance-of-tal",
         "Reload MCP tools and run: workflow_overview."
       ]
     };
@@ -212,7 +212,7 @@ const buildTargetSetup = (targetHost: InitTargetHost) => {
       steps: [
         "Open Claude Desktop MCP settings.",
         "Set command: npx",
-        "Set args: -y dance-of-tal-mcp",
+        "Set args: -y dance-of-tal",
         "Reload Claude Desktop and verify with: workflow_overview."
       ]
     };
@@ -221,7 +221,7 @@ const buildTargetSetup = (targetHost: InitTargetHost) => {
     return {
       host: "openclaw",
       steps: [
-        "Run this MCP server via stdio command: npx -y dance-of-tal-mcp.",
+        "Run this MCP server via stdio command: npx -y dance-of-tal.",
         "Call build_openclaw_profile with selected Tal/Dance.",
         "Paste returned systemPrompt into your OpenClaw assistant profile."
       ]
@@ -233,7 +233,7 @@ const buildTargetSetup = (targetHost: InitTargetHost) => {
       steps: [
         "Open Cursor MCP integration settings and add a local stdio server.",
         "Set command: npx",
-        "Set args: -y dance-of-tal-mcp",
+        "Set args: -y dance-of-tal",
         "Reload tools and test with: list_tals."
       ]
     };
@@ -251,7 +251,7 @@ const buildTargetSetup = (targetHost: InitTargetHost) => {
   return {
     host: "other",
     steps: [
-      "Connect any MCP host using stdio command: npx -y dance-of-tal-mcp.",
+      "Connect any MCP host using stdio command: npx -y dance-of-tal.",
       "Verify tool visibility with: workflow_overview.",
       "Use dot switch and dot run to validate active behavior."
     ]
@@ -264,7 +264,7 @@ const buildGenericMcpConfigSnippet = (projectDir: string) =>
       mcpServers: {
         "dance-of-tal": {
           command: "npx",
-          args: ["-y", "dance-of-tal-mcp"],
+          args: ["-y", "dance-of-tal"],
           env: {
             DANCE_OF_TAL_PROJECT_DIR: projectDir
           }
@@ -1612,7 +1612,7 @@ async function runDoctor(args: string[]) {
       id: "mcp-server-build",
       status: "warn",
       message: "MCP server build not found",
-      details: "Install package: npm install -g dance-of-tal-mcp (or run local build: npm run build)"
+      details: "Install package: npm install -g dance-of-tal (or run local build: npm run build)"
     });
   }
 

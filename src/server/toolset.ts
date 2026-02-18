@@ -82,7 +82,7 @@ export const resolveToolSet = () => {
 
   const unknown = requested.filter((tool) => !ALL_TOOL_SET.has(tool));
   if (unknown.length > 0) {
-    console.error(`[dance-of-tal-mcp] Ignoring unknown tools in DANCE_OF_TAL_TOOLS: ${unknown.join(", ")}`);
+    console.error(`[dance-of-tal] Ignoring unknown tools in DANCE_OF_TAL_TOOLS: ${unknown.join(", ")}`);
   }
 
   const resolved = requested.filter((tool) => ALL_TOOL_SET.has(tool));
