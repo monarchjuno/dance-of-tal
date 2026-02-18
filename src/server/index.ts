@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { textResult } from "./response-utils.js";
@@ -10,7 +11,7 @@ import { resolveToolSet } from "./toolset.js";
 
 const server = new McpServer({
   name: "dance-of-tal-mcp",
-  version: "0.5.2",
+  version: "0.5.3",
   description: "Tal x Dance MCP server"
 });
 

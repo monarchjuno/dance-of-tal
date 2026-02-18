@@ -1,17 +1,23 @@
 {
   "name": "dance-of-tal-mcp",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "MCP server and CLI for Tal x Dance persona composition",
   "license": "MIT",
   "author": "monarchjuno",
   "repository": {
     "type": "git",
-    "url": "https://github.com/monarchjuno/dance-of-tal.git"
+    "url": "git+https://github.com/monarchjuno/dance-of-tal.git"
   },
   "homepage": "https://github.com/monarchjuno/dance-of-tal",
   "bugs": {
     "url": "https://github.com/monarchjuno/dance-of-tal/issues"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "OPEN_SOURCE_STRATEGY.md"
+  ],
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -21,6 +27,7 @@
   ],
   "type": "module",
   "bin": {
+    "dance-of-tal-mcp": "dist/server/index.js",
     "dot": "dist/cli/dot.js",
     "tal": "dist/cli/tal.js",
     "dance": "dist/cli/dance.js"
@@ -28,7 +35,7 @@
   "scripts": {
     "dev": "tsx src/server/index.ts",
     "build": "tsup src/server/index.ts src/cli/tal.ts src/cli/dance.ts src/cli/dot.ts --format esm --out-dir dist",
-    "postinstall": "npm run build",
+    "prepublishOnly": "npm run build",
     "start": "node dist/server/index.js",
     "cli": "tsx src/cli/tal.ts",
     "cli:dance": "tsx src/cli/dance.ts",

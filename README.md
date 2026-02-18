@@ -6,16 +6,20 @@ Open-source rollout plan: `OPEN_SOURCE_STRATEGY.md`.
 
 ## Repo
 - MCP repo: `https://github.com/monarchjuno/dance-of-tal.git`
+- npm package: `dance-of-tal-mcp`
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/monarchjuno/dance-of-tal.git
-cd dance-of-tal
-npm install
-npm run build
-npx dot init --project . --target windsurf
-npx dot doctor --target windsurf
+npm install -g dance-of-tal-mcp
+dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
+dot doctor --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
+```
+
+No global install mode:
+```bash
+npx --yes --package dance-of-tal-mcp dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
+npx --yes --package dance-of-tal-mcp dot doctor --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
 ```
 
 Starter prompt for AI hosts:
@@ -28,7 +32,18 @@ If you want a richer setup in one sentence:
 Set my Tal and Dance for [my goal]. Use preset first, then ask if I want custom tuning.
 ```
 
-## Install and run
+## Install and run (package users)
+```bash
+npm install -g dance-of-tal-mcp
+dot --help
+```
+
+No global install mode:
+```bash
+npx --yes --package dance-of-tal-mcp dot --help
+```
+
+## Install and run (local development)
 ```bash
 npm install
 npm run dev
@@ -179,8 +194,8 @@ Recommended for all hosts:
 {
   "mcpServers": {
     "dance-of-tal": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/dance-of-tal/mcp/dist/server/index.js"],
+      "command": "npx",
+      "args": ["-y", "dance-of-tal-mcp"],
       "env": {
         "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
       }
@@ -312,10 +327,10 @@ Suggested flow:
 
 ```bash
 # list available tools from this MCP server
-npx -y mcporter list --stdio "node ./dist/server/index.js" --schema
+npx -y mcporter list --stdio "npx -y dance-of-tal-mcp" --schema
 
 # generate OpenClaw profile payload
-npx -y mcporter call --stdio "node ./dist/server/index.js" \
+npx -y mcporter call --stdio "npx -y dance-of-tal-mcp" \
   build_openclaw_profile \
   talSlug="elon-musk-case-tal" \
   danceSlug="boardroom-brief" \
