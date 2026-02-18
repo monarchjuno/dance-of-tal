@@ -6,7 +6,6 @@ Open-source rollout plan: `OPEN_SOURCE_STRATEGY.md`.
 
 ## Repo
 - MCP repo: `https://github.com/monarchjuno/dance-of-tal.git`
-- Web repo: `https://github.com/monarchjuno/dance-of-tal-web.git` (for GUI onboarding `/connect`)
 
 ## Quick Start
 
