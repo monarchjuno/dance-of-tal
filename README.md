@@ -18,6 +18,16 @@ npx dot init --project . --target windsurf
 npx dot doctor --target windsurf
 ```
 
+Starter prompt for AI hosts:
+```text
+Set my Tal and Dance.
+```
+
+If you want a richer setup in one sentence:
+```text
+Set my Tal and Dance for [my goal]. Use preset first, then ask if I want custom tuning.
+```
+
 ## Install and run
 ```bash
 npm install
@@ -34,6 +44,13 @@ If you want to run `dot` directly (without `npx`), link once:
 ```bash
 npm link
 dot --help
+```
+
+Optional CLI-first flow (skip MCP host setup):
+```bash
+dot init
+dot use --tal <tal-slug> --dance <dance-slug> --name "My Combo"
+dot run --task "Your real task"
 ```
 
 ## dot setup flow
@@ -74,14 +91,26 @@ npm run build
 npm run start
 ```
 
+## Server code layout
+- `src/server/index.ts`: entrypoint and tool registration bootstrap.
+- `src/server/tools/workflow-tools.ts`: workflow session + local-config-first activation/run logic.
+- `src/server/tools/catalog-tools.ts`: Tal/Dance catalog and prompt/profile tools.
+- `src/server/tools/custom-tools.ts`: custom Tal/Dance generation tools.
+- `src/server/tools/gpts-tools.ts`: compact GPTs query/recommend tools.
+- `src/server/setup-mode.ts`: preset/custom/hybrid mode advisor.
+- `src/server/project-target.ts`: project directory resolution for `.dance-of-tal`.
+- `src/server/toolset.ts`: tool loading sets (`core`, `standard`, `all`, custom list).
+- `src/cli/dot-config.ts` / `src/cli/dot-session-config.ts`: project-local persistence handlers used by MCP.
+
 ## Workflow-first MCP tools
 
 ### Core workflow (recommended)
 1. `workflow_overview`
-2. `initialize_styling_session`
-3. `next_combo`
-4. `set_active_combo`
-5. `run_active_combo`
+2. `advise_setup_mode`
+3. `initialize_styling_session`
+4. `next_combo`
+5. `set_active_combo`
+6. `run_active_combo`
 
 Helper tools:
 - `get_session`
@@ -112,13 +141,53 @@ Helper tools:
 
 ## Recommended UX flow (host/agent)
 
-1. Call `initialize_styling_session` with user goal.
-2. Show `comboOptions` and `nextBestCombo` from response.
-3. Confirm combo (or Tal-only / Dance-only mode) with user, then call `set_active_combo`.
-4. For each user request, call `run_active_combo`.
-5. If user wants a different style, call `next_combo` and re-apply.
+1. Call `advise_setup_mode` with user goal.
+2. Ask the returned clarifying questions (preset vs custom vs hybrid).
+3. Call `initialize_styling_session` (or `next_combo`) using the selected setup mode.
+4. Confirm combo (or Tal-only / Dance-only mode) with user, then call `set_active_combo`.
+5. For each user request, call `run_active_combo` (session optional).
+6. If user wants a different style, call `next_combo` and re-apply.
 
 This provides a clear state-machine flow tuned for Tal x Dance behavior control.
+
+### MCP + CLI hybrid persistence
+- Local config is the source of truth: `.dance-of-tal/config.json`.
+- Workflow sessions are persisted in `.dance-of-tal/sessions.json`.
+- `set_active_combo` persists the active selection by default.
+- `set_active_combo` can be called without `sessionId` (auto-session bootstrap).
+- If persistence fails, response status becomes `active_combo_set_not_persisted` with a `warning` field.
+- `get_session`, `list_sessions`, `next_combo`, `set_active_combo`, `clear_session` read/write the persisted session file.
+- `run_active_combo` can run from:
+  1) active session (`sessionId`)
+  2) local config (`projectDir` / env / discovered `.dance-of-tal/config.json`)
+- Resolution order for target project directory:
+  1) `projectDir` argument
+  2) `session.projectDir`
+  3) workspace envs (`DANCE_OF_TAL_PROJECT_DIR`, `WORKSPACE_ROOT`, `WORKSPACE_FOLDER`, `VSCODE_WORKSPACE_FOLDER`, `CURSOR_WORKSPACE_PATH`, `WINDSURF_WORKSPACE_PATH`, `CLAUDE_PROJECT_DIR`, `OPENCLAW_PROJECT_DIR`)
+  4) fallback discovery from existing `.dance-of-tal/config.json` in `PWD` / `INIT_CWD` / server cwd
+- To disable persistence for a call: set `persist: false`.
+- Workflow tools now return concise, user-facing payloads by default (to reduce noisy outputs like session IDs).
+- If you need debugging/internal fields, pass `verbose: true`.
+- `advise_setup_mode`, `initialize_styling_session`, and `next_combo` support setup hints:
+  - `mode`: `auto|preset|custom|hybrid`
+  - `hasUserSources`: boolean
+  - `sourceTypes`: `text|file|url`
+- `set_active_combo` supports Tal-only and Dance-only modes.
+
+Recommended for all hosts:
+```json
+{
+  "mcpServers": {
+    "dance-of-tal": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/dance-of-tal/mcp/dist/server/index.js"],
+      "env": {
+        "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
+      }
+    }
+  }
+}
+```
 
 ## Hardcoded catalog (open-source friendly)
 - Tal, Dance, and recommendation data are hardcoded in code:
@@ -217,6 +286,16 @@ dance list
 ```
 
 The server extracts reusable thinking/output patterns from these inputs and returns structured Tal/Dance JSON plus prompts.
+By default, custom generation tools also persist created data to `.dance-of-tal/config.json` using CLI persistence handlers:
+- `build_custom_tal`: saves custom Tal + Tal-only combo
+- `build_custom_dance`: saves custom Dance + Dance-only combo
+- `build_custom_tal_dance`: saves custom Tal + custom Dance + combo
+
+Optional inputs for custom tools:
+- `projectDir`
+- `comboName`
+- `persist` (default `true`)
+- `activate` (default `true`)
 
 ## OpenClaw integration (openclaw.ai Personal AI Assistant)
 

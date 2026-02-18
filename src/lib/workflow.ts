@@ -60,6 +60,7 @@ export type WorkflowSession = {
   id: string;
   goal: string;
   language: string;
+  projectDir?: string;
   createdAt: string;
   updatedAt: string;
   filters: WorkflowFilters;
@@ -261,6 +262,7 @@ const buildPromptPack = ({ talSlug, danceSlug }: { talSlug: string | null; dance
 export const initializeStylingSession = ({
   goal,
   language,
+  projectDir,
   talCategory,
   danceCategory,
   tag,
@@ -270,6 +272,7 @@ export const initializeStylingSession = ({
 }: {
   goal: string;
   language?: string;
+  projectDir?: string;
   talCategory?: string;
   danceCategory?: string;
   tag?: string;
@@ -286,6 +289,7 @@ export const initializeStylingSession = ({
     id,
     goal,
     language: language?.trim() || "English",
+    projectDir: projectDir?.trim() || undefined,
     createdAt: now,
     updatedAt: now,
     filters,
@@ -406,6 +410,15 @@ export const setActiveCombo = ({
 
 export const getSession = (sessionId: string) => sessions.get(sessionId) ?? null;
 
+export const upsertSession = (session: WorkflowSession) => {
+  sessions.set(session.id, session);
+  return session;
+};
+
+export const removeSession = (sessionId: string) => {
+  sessions.delete(sessionId);
+};
+
 export const listSessions = () =>
   Array.from(sessions.values()).map((session) => ({
     id: session.id,
@@ -456,21 +469,26 @@ export const getWorkflowOverview = () => ({
   flow: [
     {
       step: 1,
+      name: "advise_setup_mode",
+      purpose: "Decide preset/custom/hybrid strategy and ask clarifying questions"
+    },
+    {
+      step: 2,
       name: "initialize_styling_session",
       purpose: "Start a Tal x Dance session and receive recommended combos based on user goal"
     },
     {
-      step: 2,
+      step: 3,
       name: "next_combo",
       purpose: "Refresh or refine combo recommendations by need/category/tag"
     },
     {
-      step: 3,
+      step: 4,
       name: "set_active_combo",
       purpose: "Lock a Tal + Dance combo as active for the session (or Tal-only / Dance-only)"
     },
     {
-      step: 4,
+      step: 5,
       name: "run_active_combo",
       purpose: "Build a task-ready SYSTEM + USER package using the active combo"
     }
