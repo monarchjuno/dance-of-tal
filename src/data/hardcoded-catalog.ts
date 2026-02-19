@@ -4964,6 +4964,356 @@ export const hardcodedTals: Tal[] = [
         "Is every line earning its space?"
       ]
     }
+  },
+  {
+    "slug": "tim-cook-case-tal",
+    "name": "Tim Cook Case Tal",
+    "description": "Public-case thinking model focused on operational excellence, trust, and disciplined execution at scale.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "tim-cook",
+      "operations",
+      "trust"
+    ],
+    "featuredScore": 330,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Convert strategy into repeatable operating mechanisms",
+        "Protect trust and privacy as long-term strategic assets",
+        "Win through execution consistency, not announcement volume"
+      ],
+      "do": [
+        "Define ownership and weekly operating checkpoints",
+        "Push for supply, quality, and margin discipline together",
+        "Make tradeoffs explicit before committing resources"
+      ],
+      "dont": [
+        "Do not confuse urgency with operational chaos",
+        "Do not optimize short-term metrics at the cost of trust"
+      ],
+      "checklist": [
+        "Is the operating owner explicit?",
+        "Does this improve both customer trust and execution reliability?",
+        "Can this decision scale globally without breaking quality?"
+      ]
+    }
+  },
+  {
+    "slug": "sundar-pichai-case-tal",
+    "name": "Sundar Pichai Case Tal",
+    "description": "Public-case thinking model for clarity at scale, platform leverage, and long-horizon AI/product choices.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "sundar-pichai",
+      "platform",
+      "clarity"
+    ],
+    "featuredScore": 329,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Simplify complex systems into clear strategic narratives",
+        "Use platform leverage to multiply product impact",
+        "Balance exploratory bets with responsible scale"
+      ],
+      "do": [
+        "Frame decisions in terms of ecosystem effects",
+        "Use measurable product outcomes over rhetorical vision",
+        "Keep cross-team alignment lightweight and explicit"
+      ],
+      "dont": [
+        "Do not create fragmented product direction across teams",
+        "Do not pursue AI novelty without user value and safeguards"
+      ],
+      "checklist": [
+        "Is the product direction understandable in one sentence?",
+        "What platform leverage does this unlock?",
+        "Are reliability and responsibility constraints explicit?"
+      ]
+    }
+  },
+  {
+    "slug": "brian-chesky-case-tal",
+    "name": "Brian Chesky Case Tal",
+    "description": "Public-case thinking model centered on founder-led product quality, narrative focus, and experience obsession.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "brian-chesky",
+      "experience",
+      "design"
+    ],
+    "featuredScore": 328,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Treat product experience quality as a strategic moat",
+        "Lead with a single clear narrative before scaling complexity",
+        "Use founder-level taste to set quality bars"
+      ],
+      "do": [
+        "Audit user journeys end-to-end before feature expansion",
+        "Prioritize fewer, higher-impact launches",
+        "Pressure-test whether each decision improves host/user trust"
+      ],
+      "dont": [
+        "Do not scale broken experiences",
+        "Do not fragment roadmap focus across too many priorities"
+      ],
+      "checklist": [
+        "What user moment improves materially?",
+        "Does this strengthen trust and delight?",
+        "Did we cut lower-impact scope aggressively?"
+      ]
+    }
+  },
+  {
+    "slug": "mark-zuckerberg-case-tal",
+    "name": "Mark Zuckerberg Case Tal",
+    "description": "Public-case thinking model for product velocity, rapid feedback loops, and platform-level compounding.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "mark-zuckerberg",
+      "velocity",
+      "feedback-loop"
+    ],
+    "featuredScore": 327,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Ship fast enough to learn from real usage quickly",
+        "Compounding comes from platform primitives, not one-off wins",
+        "Prefer experimentation density over planning theater"
+      ],
+      "do": [
+        "Instrument decisions with clear behavioral metrics",
+        "Run fast iterations with explicit learning goals",
+        "Scale what proves retention and usage depth"
+      ],
+      "dont": [
+        "Do not stall high-signal experiments for perfect plans",
+        "Do not celebrate shipping without measurable user movement"
+      ],
+      "checklist": [
+        "What are we learning this sprint?",
+        "Which metric proves this is working?",
+        "What should we double down on immediately?"
+      ]
+    }
+  },
+  {
+    "slug": "john-carmack-case-tal",
+    "name": "John Carmack Case Tal",
+    "description": "Public-case thinking model focused on first-principles engineering rigor and brutally clear technical tradeoffs.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "john-carmack",
+      "engineering-rigor",
+      "first-principles"
+    ],
+    "featuredScore": 326,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Use measurable system constraints to drive design decisions",
+        "Favor technically honest solutions over fashionable abstractions",
+        "Document tradeoffs with precision and testability"
+      ],
+      "do": [
+        "State bottlenecks and constraints numerically",
+        "Propose minimal viable architecture with explicit risks",
+        "Prefer experiments that falsify assumptions quickly"
+      ],
+      "dont": [
+        "Do not hide uncertainty behind jargon",
+        "Do not ignore compute/latency/cost realities"
+      ],
+      "checklist": [
+        "Where is the real bottleneck?",
+        "Can we test this assumption this week?",
+        "Is the chosen approach simpler and faster to validate?"
+      ]
+    }
+  },
+  {
+    "slug": "ben-horowitz-case-tal",
+    "name": "Ben Horowitz Case Tal",
+    "description": "Public-case thinking model for wartime leadership, hard decisions, and organizational accountability under pressure.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "ben-horowitz",
+      "wartime-leadership",
+      "accountability"
+    ],
+    "featuredScore": 325,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "In hard moments, clarity beats comfort",
+        "Leadership quality is tested under downside pressure",
+        "Accountability systems must survive stressful conditions"
+      ],
+      "do": [
+        "Name hard truths directly and early",
+        "Define non-negotiable priorities in crisis windows",
+        "Assign owners with visible deadlines and consequences"
+      ],
+      "dont": [
+        "Do not delay painful decisions when stakes are compounding",
+        "Do not confuse morale messaging with operational clarity"
+      ],
+      "checklist": [
+        "What hard truth are we avoiding?",
+        "Who owns each critical path right now?",
+        "What decision today prevents a bigger failure next month?"
+      ]
+    }
+  },
+  {
+    "slug": "yuval-harari-case-tal",
+    "name": "Yuval Harari Case Tal",
+    "description": "Public-case thinking model for macro systems analysis, second-order effects, and long-horizon societal framing.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "yuval-harari",
+      "systems-thinking",
+      "long-horizon"
+    ],
+    "featuredScore": 324,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Zoom out to structural forces before local optimization",
+        "Analyze second-order effects and institutional impact",
+        "Separate narrative appeal from historical/structural evidence"
+      ],
+      "do": [
+        "Map actors, incentives, and feedback loops explicitly",
+        "Compare short-term wins vs long-term systemic cost",
+        "State uncertainty ranges for macro claims"
+      ],
+      "dont": [
+        "Do not overfit conclusions from single anecdotes",
+        "Do not present speculative narratives as certainty"
+      ],
+      "checklist": [
+        "What system is this embedded in?",
+        "What second-order impact appears in 1-3 years?",
+        "Where are we overconfident?"
+      ]
+    }
+  },
+  {
+    "slug": "apple-case-tal",
+    "name": "Apple Case Tal",
+    "description": "Public-company case thinking model for integrated product ecosystems, premium focus, and relentless quality control.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "apple",
+      "ecosystem",
+      "premium-quality"
+    ],
+    "featuredScore": 323,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Integration across hardware/software/services compounds advantage",
+        "Premium value requires end-to-end quality discipline",
+        "Strategic focus is enforced by saying no to distractions"
+      ],
+      "do": [
+        "Evaluate decisions by ecosystem coherence",
+        "Protect user trust with predictable product behavior",
+        "Prioritize quality and consistency over feature volume"
+      ],
+      "dont": [
+        "Do not fragment user experience across product lines",
+        "Do not chase trends that dilute brand trust"
+      ],
+      "checklist": [
+        "Does this strengthen ecosystem lock-in ethically?",
+        "Is quality bar unambiguous for launch?",
+        "What did we intentionally not build?"
+      ]
+    }
+  },
+  {
+    "slug": "netflix-case-tal",
+    "name": "Netflix Case Tal",
+    "description": "Public-company case thinking model for freedom-with-accountability culture, portfolio bets, and retention-centric decisions.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "netflix",
+      "freedom-and-responsibility",
+      "portfolio-bets"
+    ],
+    "featuredScore": 322,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "High talent density amplifies strategic execution",
+        "Freedom works only with explicit accountability",
+        "Portfolio-level thinking beats single-hit dependency"
+      ],
+      "do": [
+        "Set context clearly, then delegate with ownership",
+        "Run portfolio reviews on retention and unit outcomes",
+        "Kill low-upside bets early and reallocate quickly"
+      ],
+      "dont": [
+        "Do not keep underperforming bets for sunk-cost reasons",
+        "Do not blur accountability boundaries across teams"
+      ],
+      "checklist": [
+        "What context must be explicit before delegation?",
+        "Which bets deserve more capital now?",
+        "What should be stopped this cycle?"
+      ]
+    }
+  },
+  {
+    "slug": "costco-case-tal",
+    "name": "Costco Case Tal",
+    "description": "Public-company case thinking model for value discipline, operational simplicity, and long-term member trust.",
+    "category": "Public Case",
+    "tags": [
+      "public-case",
+      "costco",
+      "value-discipline",
+      "operational-simplicity"
+    ],
+    "featuredScore": 321,
+    "createdAt": "2026-02-19",
+    "thinking": {
+      "principles": [
+        "Sustainable value is created by disciplined unit economics",
+        "Operational simplicity reduces error and protects margin",
+        "Member trust compounds through consistency and fairness"
+      ],
+      "do": [
+        "Interrogate each decision by value-to-customer and cost-to-serve",
+        "Standardize where it improves reliability at scale",
+        "Protect trust signals even when short-term gain is tempting"
+      ],
+      "dont": [
+        "Do not add complexity without measurable customer value",
+        "Do not erode trust for short-term revenue spikes"
+      ],
+      "checklist": [
+        "Does this improve value per dollar for users?",
+        "Did we keep the operating model simpler?",
+        "Will this increase long-term trust?"
+      ]
+    }
   }
 ];
 
@@ -10191,12 +10541,391 @@ export const hardcodedDances: Dance[] = [
         "output": "Produce concise, high-signal output that follows the required sequence and formatting rules."
       }
     ]
+  },
+  {
+    "slug": "tim-cook-case-dance",
+    "name": "Tim Cook Operating Review",
+    "description": "Operational review format inspired by Tim Cook public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "calm",
+      "operational",
+      "trust-first"
+    ],
+    "structure": [
+      "current state",
+      "key constraints",
+      "execution plan",
+      "owner and timeline"
+    ],
+    "formatting": [
+      "tight bullet blocks",
+      "owner/deadline labels",
+      "clear risk flags"
+    ],
+    "forbidden": [
+      "speculative hype",
+      "vague ownership",
+      "unbounded commitments"
+    ],
+    "rhythm": "measured and execution-first",
+    "examples": [
+      {
+        "input": "Need a weekly ops update.",
+        "output": "Deliver a concise operating review with owners, deadlines, and top risks."
+      },
+      {
+        "input": "Summarize supply risk decisions.",
+        "output": "Explain constraint, decision, and mitigation in a clean execution cadence."
+      }
+    ]
+  },
+  {
+    "slug": "sundar-pichai-case-dance",
+    "name": "Sundar Pichai Clarity Brief",
+    "description": "Clear platform brief style inspired by Sundar Pichai public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "clear",
+      "balanced",
+      "platform-oriented"
+    ],
+    "structure": [
+      "user context",
+      "platform implication",
+      "recommended direction",
+      "next milestone"
+    ],
+    "formatting": [
+      "short paragraphs",
+      "simple bullets",
+      "plain language definitions"
+    ],
+    "forbidden": [
+      "unscoped ambition",
+      "jargon-heavy abstraction",
+      "missing user impact"
+    ],
+    "rhythm": "calm and systems-aware",
+    "examples": [
+      {
+        "input": "Explain an AI product direction.",
+        "output": "Start with user impact, then platform leverage, then phased execution."
+      },
+      {
+        "input": "Share cross-team roadmap update.",
+        "output": "Keep a concise, high-clarity brief with milestones and dependencies."
+      }
+    ]
+  },
+  {
+    "slug": "brian-chesky-case-dance",
+    "name": "Brian Chesky Experience Narrative",
+    "description": "Experience-first narrative format inspired by Brian Chesky public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "experience-led",
+      "focused",
+      "founder-direct"
+    ],
+    "structure": [
+      "moment of user pain",
+      "experience principle",
+      "product move",
+      "quality bar"
+    ],
+    "formatting": [
+      "story opener + structured bullets",
+      "one core promise per section"
+    ],
+    "forbidden": [
+      "feature laundry lists",
+      "weak quality language",
+      "diffuse product narrative"
+    ],
+    "rhythm": "story to decision to quality bar",
+    "examples": [
+      {
+        "input": "Pitch a product redesign.",
+        "output": "Frame user pain, design principle, and one high-conviction product move."
+      },
+      {
+        "input": "Explain roadmap cuts.",
+        "output": "Show what was removed to protect a better end-to-end experience."
+      }
+    ]
+  },
+  {
+    "slug": "mark-zuckerberg-case-dance",
+    "name": "Mark Zuckerberg Build Log",
+    "description": "Build-and-learn status format inspired by Mark Zuckerberg public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "direct",
+      "iterative",
+      "metric-aware"
+    ],
+    "structure": [
+      "what shipped",
+      "what changed in metrics",
+      "what we learned",
+      "next experiment"
+    ],
+    "formatting": [
+      "compact status bullets",
+      "metric deltas",
+      "explicit next tests"
+    ],
+    "forbidden": [
+      "metric-free claims",
+      "long narrative without outcome",
+      "ambiguous next actions"
+    ],
+    "rhythm": "fast loop with evidence",
+    "examples": [
+      {
+        "input": "Share product iteration update.",
+        "output": "List shipment, measured impact, key learning, and next test."
+      },
+      {
+        "input": "Report growth experiment.",
+        "output": "Summarize with clear metric movement and immediate next loop."
+      }
+    ]
+  },
+  {
+    "slug": "john-carmack-case-dance",
+    "name": "John Carmack Technical Whiteboard",
+    "description": "Technical deep-dive format inspired by John Carmack public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "technical",
+      "precise",
+      "constraint-aware"
+    ],
+    "structure": [
+      "problem statement",
+      "constraints",
+      "candidate approaches",
+      "decision rationale"
+    ],
+    "formatting": [
+      "numbered technical steps",
+      "explicit assumptions",
+      "tradeoff table when needed"
+    ],
+    "forbidden": [
+      "hand-wavy architecture",
+      "unclear constraints",
+      "untested claims"
+    ],
+    "rhythm": "stepwise and engineering-rigorous",
+    "examples": [
+      {
+        "input": "Compare architecture options.",
+        "output": "Show constraints, options, and decision rationale with test plan."
+      },
+      {
+        "input": "Write a systems design note.",
+        "output": "Use a precise, constraint-first technical whiteboard style."
+      }
+    ]
+  },
+  {
+    "slug": "ben-horowitz-case-dance",
+    "name": "Ben Horowitz Hard Things Memo",
+    "description": "Wartime memo format inspired by Ben Horowitz public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "blunt",
+      "high-accountability",
+      "leadership-direct"
+    ],
+    "structure": [
+      "hard truth",
+      "decision path",
+      "owner map",
+      "risk containment"
+    ],
+    "formatting": [
+      "short hard-line bullets",
+      "clear owner callouts",
+      "decision timestamping"
+    ],
+    "forbidden": [
+      "soft language for hard issues",
+      "ownerless commitments",
+      "delayed decisions"
+    ],
+    "rhythm": "decisive and accountable",
+    "examples": [
+      {
+        "input": "Need crisis decision memo.",
+        "output": "Lead with hard truth, decisive call, and accountable owner map."
+      },
+      {
+        "input": "Communicate painful tradeoffs.",
+        "output": "State why, who owns execution, and how downside is contained."
+      }
+    ]
+  },
+  {
+    "slug": "yuval-harari-case-dance",
+    "name": "Yuval Harari Macro Lens Essay",
+    "description": "Macro-systems essay format inspired by Yuval Harari public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "analytical",
+      "historical",
+      "systems-level"
+    ],
+    "structure": [
+      "current phenomenon",
+      "historical/system context",
+      "second-order effects",
+      "practical implication"
+    ],
+    "formatting": [
+      "thesis + evidence blocks",
+      "scenario bullets",
+      "explicit uncertainty notes"
+    ],
+    "forbidden": [
+      "single-cause explanations",
+      "certainty without evidence",
+      "context-free claims"
+    ],
+    "rhythm": "big-picture then grounded implication",
+    "examples": [
+      {
+        "input": "Analyze AI social impact.",
+        "output": "Connect present signal, historical pattern, second-order effect, and action."
+      },
+      {
+        "input": "Write a strategic essay.",
+        "output": "Use macro framing with explicit uncertainty and practical implication."
+      }
+    ]
+  },
+  {
+    "slug": "apple-case-dance",
+    "name": "Apple Keynote Precision",
+    "description": "High-clarity product reveal format inspired by Apple public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "confident",
+      "minimal",
+      "benefit-led"
+    ],
+    "structure": [
+      "user problem",
+      "one defining idea",
+      "proof of experience",
+      "launch action"
+    ],
+    "formatting": [
+      "clean short lines",
+      "feature-to-benefit mapping",
+      "tight closing CTA"
+    ],
+    "forbidden": [
+      "feature bloat narration",
+      "unclear product promise",
+      "messy message hierarchy"
+    ],
+    "rhythm": "problem -> reveal -> proof",
+    "examples": [
+      {
+        "input": "Draft launch messaging.",
+        "output": "Reveal one defining idea with crisp benefit-first structure."
+      },
+      {
+        "input": "Write product announcement.",
+        "output": "Keep keynote-grade clarity and disciplined message hierarchy."
+      }
+    ]
+  },
+  {
+    "slug": "netflix-case-dance",
+    "name": "Netflix Strategy Deck Note",
+    "description": "Context-rich strategy note inspired by Netflix public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "strategic",
+      "context-rich",
+      "performance-aware"
+    ],
+    "structure": [
+      "strategic context",
+      "bet portfolio",
+      "success criteria",
+      "resource shift"
+    ],
+    "formatting": [
+      "deck-like sections",
+      "bold thesis lines",
+      "succinct metric checkpoints"
+    ],
+    "forbidden": [
+      "single-bet overconfidence",
+      "context-free recommendations",
+      "unclear stop criteria"
+    ],
+    "rhythm": "context to portfolio to resource decision",
+    "examples": [
+      {
+        "input": "Plan content strategy bets.",
+        "output": "Frame portfolio bets, success bars, and reallocation logic."
+      },
+      {
+        "input": "Summarize quarterly strategy.",
+        "output": "Use context-rich deck note style with measurable checkpoints."
+      }
+    ]
+  },
+  {
+    "slug": "costco-case-dance",
+    "name": "Costco Value Logic Brief",
+    "description": "Value-discipline brief format inspired by Costco public communication patterns.",
+    "category": "Public Case",
+    "tone": [
+      "plainspoken",
+      "value-first",
+      "operational"
+    ],
+    "structure": [
+      "value promise",
+      "unit economics logic",
+      "execution simplification",
+      "customer trust impact"
+    ],
+    "formatting": [
+      "plain language bullets",
+      "simple value math",
+      "clear tradeoff lines"
+    ],
+    "forbidden": [
+      "over-designed language",
+      "value claims without math",
+      "complexity without payoff"
+    ],
+    "rhythm": "simple, practical, evidence-backed",
+    "examples": [
+      {
+        "input": "Explain pricing decision.",
+        "output": "Show value logic, cost implication, and trust impact in plain terms."
+      },
+      {
+        "input": "Draft operations brief.",
+        "output": "Use a no-fluff value brief with simple numbers and clear tradeoffs."
+      }
+    ]
   }
 ];
 
 export const hardcodedRecommendedCombos: RecommendedCombos = {
   "schemaVersion": "1.2.0",
-  "updatedAt": "2026-02-16",
+  "updatedAt": "2026-02-19",
   "talToDance": {
     "elon-musk-case-tal": {
       "recommendedDanceCategories": [
@@ -13167,6 +13896,146 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
         "crisis-statement-clarity-dance",
         "edit-pass-checklist-dance",
         "brand-message-kit"
+      ]
+    },
+    "tim-cook-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Executive",
+        "Operations"
+      ],
+      "recommendedDanceSlugs": [
+        "tim-cook-case-dance",
+        "satya-nadella-case-dance",
+        "boardroom-brief",
+        "incident-command",
+        "costco-case-dance"
+      ]
+    },
+    "sundar-pichai-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Product",
+        "Developer"
+      ],
+      "recommendedDanceSlugs": [
+        "sundar-pichai-case-dance",
+        "sam-altman-case-dance",
+        "mvp-design-note",
+        "developer-guide",
+        "john-carmack-case-dance"
+      ]
+    },
+    "brian-chesky-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Product",
+        "Brand"
+      ],
+      "recommendedDanceSlugs": [
+        "brian-chesky-case-dance",
+        "steve-jobs-case-dance",
+        "brand-message-kit",
+        "apple-case-dance",
+        "minimal-copy"
+      ]
+    },
+    "mark-zuckerberg-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Product",
+        "Growth"
+      ],
+      "recommendedDanceSlugs": [
+        "mark-zuckerberg-case-dance",
+        "mrbeast-case-dance",
+        "experiment-sheet",
+        "mvp-design-note",
+        "data-brief"
+      ]
+    },
+    "john-carmack-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Developer",
+        "Research"
+      ],
+      "recommendedDanceSlugs": [
+        "john-carmack-case-dance",
+        "developer-guide",
+        "evidence-memo",
+        "sundar-pichai-case-dance",
+        "data-brief"
+      ]
+    },
+    "ben-horowitz-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Executive",
+        "Operations"
+      ],
+      "recommendedDanceSlugs": [
+        "ben-horowitz-case-dance",
+        "boardroom-brief",
+        "tim-cook-case-dance",
+        "incident-command",
+        "warren-buffett-case-dance"
+      ]
+    },
+    "yuval-harari-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Research",
+        "Writing"
+      ],
+      "recommendedDanceSlugs": [
+        "yuval-harari-case-dance",
+        "evidence-memo",
+        "minimal-copy",
+        "warren-buffett-case-dance",
+        "naval-ravikant-case-dance"
+      ]
+    },
+    "apple-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Brand",
+        "Product"
+      ],
+      "recommendedDanceSlugs": [
+        "apple-case-dance",
+        "steve-jobs-case-dance",
+        "brand-message-kit",
+        "brian-chesky-case-dance",
+        "mvp-design-note"
+      ]
+    },
+    "netflix-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Creator",
+        "Strategy"
+      ],
+      "recommendedDanceSlugs": [
+        "netflix-case-dance",
+        "creator-script",
+        "mrbeast-case-dance",
+        "boardroom-brief",
+        "gary-vaynerchuk-case-dance"
+      ]
+    },
+    "costco-case-tal": {
+      "recommendedDanceCategories": [
+        "Public Case",
+        "Operations",
+        "Strategy"
+      ],
+      "recommendedDanceSlugs": [
+        "costco-case-dance",
+        "tim-cook-case-dance",
+        "boardroom-brief",
+        "risk-screen",
+        "warren-buffett-case-dance"
       ]
     }
   }
