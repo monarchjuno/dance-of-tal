@@ -22,6 +22,7 @@ export const ALL_TOOLS = [
   "build_custom_tal",
   "build_custom_dance",
   "build_custom_tal_dance",
+  "abstract_tal_dance",
   "get_gpts_bootstrap",
   "list_gpts_tals",
   "list_gpts_dances",
@@ -55,7 +56,8 @@ export const STANDARD_TOOLS = [
   "build_openclaw_profile",
   "build_custom_tal",
   "build_custom_dance",
-  "build_custom_tal_dance"
+  "build_custom_tal_dance",
+  "abstract_tal_dance"
 ] as const;
 
 export type ToolName = (typeof ALL_TOOLS)[number];

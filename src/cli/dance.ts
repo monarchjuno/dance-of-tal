@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildCustomDance, CustomSource } from "../lib/customize.js";
+import { buildCustomDance, resolveUnifiedSources } from "../lib/customize.js";
 import { findDance, listDances } from "../lib/persona.js";
 
 function printUsage() {
@@ -8,7 +8,7 @@ function printUsage() {
 Usage:
   dance list
   dance show <dance-slug>
-  dance custom --name "<name>" [--text "..."] [--file ./notes.md] [--url https://example.com] [--goal "..."] [--category "..."] [--tags "a,b,c"]
+  dance custom --name "<name>" --input "..." [--input "..."] [--goal "..."] [--category "..."] [--tags "a,b,c"]
 `);
 }
 
@@ -26,11 +26,12 @@ function readFlags(args: string[], flag: string) {
   return values;
 }
 
-function buildSourcesFromArgs(args: string[]): CustomSource[] {
-  const textSources = readFlags(args, "--text").map((value) => ({ type: "text" as const, value }));
-  const fileSources = readFlags(args, "--file").map((value) => ({ type: "file" as const, value }));
-  const urlSources = readFlags(args, "--url").map((value) => ({ type: "url" as const, value }));
-  return [...textSources, ...fileSources, ...urlSources];
+function buildInputsFromArgs(args: string[]) {
+  const unifiedInputs = readFlags(args, "--input");
+  const legacyText = readFlags(args, "--text");
+  const legacyFile = readFlags(args, "--file");
+  const legacyUrl = readFlags(args, "--url");
+  return [...unifiedInputs, ...legacyText, ...legacyFile, ...legacyUrl];
 }
 
 async function main() {
@@ -58,8 +59,8 @@ async function main() {
   if (command === "custom") {
     const name = readFlag(args, "--name");
     if (!name) throw new Error("--name is required: dance custom --name \"...\"");
-    const sources = buildSourcesFromArgs(args);
-    if (sources.length === 0) throw new Error("At least one source is required: --text, --file, or --url");
+    const inputs = buildInputsFromArgs(args);
+    const sources = await resolveUnifiedSources({ inputs });
     const goal = readFlag(args, "--goal");
     const category = readFlag(args, "--category");
     const tags = (readFlag(args, "--tags") ?? "")

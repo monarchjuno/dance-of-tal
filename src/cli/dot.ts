@@ -4,7 +4,7 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { Dance, Tal } from "../data/types.js";
-import { buildCustomDance, buildCustomTal, CustomSource } from "../lib/customize.js";
+import { buildCustomDance, buildCustomTal, resolveUnifiedSources } from "../lib/customize.js";
 import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal, listDances, listTals } from "../lib/persona.js";
 import {
   clearActiveCombo,
@@ -96,7 +96,7 @@ function printUsage() {
       `  ${ui.command("dot doctor --target windsurf")}`,
       `  ${ui.command('dot use --dance boardroom-brief --name "Output Only"')}`,
       `  ${ui.command("dot switch tal")}`,
-      `  ${ui.command('dot combo custom --name "My Custom" --tal-only --text "first principles and constraints"')}`,
+      `  ${ui.command('dot combo custom --name "My Custom" --tal-only --input "first principles and constraints"')}`,
       `  ${ui.command("dot list dance --category Executive --query concise")}`,
       "",
       ui.section("Project Config"),
@@ -134,11 +134,12 @@ function readFlags(args: string[], flag: string) {
   return values;
 }
 
-function buildSourcesFromArgs(args: string[]): CustomSource[] {
-  const textSources = readFlags(args, "--text").map((value) => ({ type: "text" as const, value }));
-  const fileSources = readFlags(args, "--file").map((value) => ({ type: "file" as const, value }));
-  const urlSources = readFlags(args, "--url").map((value) => ({ type: "url" as const, value }));
-  return [...textSources, ...fileSources, ...urlSources];
+function buildInputsFromArgs(args: string[]) {
+  const unifiedInputs = readFlags(args, "--input");
+  const legacyText = readFlags(args, "--text");
+  const legacyFile = readFlags(args, "--file");
+  const legacyUrl = readFlags(args, "--url");
+  return [...unifiedInputs, ...legacyText, ...legacyFile, ...legacyUrl];
 }
 
 const isMode = (value: string): value is "thinking" | "output" | "combined" => {
@@ -162,7 +163,7 @@ type InitWizardSelection = {
   danceSlug?: string;
   customTalName?: string;
   customDanceName?: string;
-  customSources?: CustomSource[];
+  customInputs?: string[];
   comboName?: string;
 };
 
@@ -388,57 +389,28 @@ async function selectRefChoiceByNumber({
   }
 }
 
-async function collectCustomSources({
+async function collectCustomInputs({
   ask
 }: {
   ask: (prompt: string) => Promise<string>;
 }) {
-  const sources: CustomSource[] = [];
+  const inputs: string[] = [];
   while (true) {
     console.log("");
-    console.log("  1) Add text");
-    console.log("  2) Add file path");
-    console.log("  3) Add URL");
-    console.log("  4) Done");
-    const action = (await ask("Choose source action 1-4 [4]: ")) || "4";
-    if (action === "4") {
-      if (sources.length === 0) {
-        console.log(ui.warning("Add at least one source before finishing."));
+    const value = await ask(`Input #${inputs.length + 1} (text, file path, URL, or mixed note). Press Enter to finish: `);
+    const normalized = value.trim();
+
+    if (!normalized) {
+      if (inputs.length === 0) {
+        console.log(ui.warning("Add at least one input before finishing."));
         continue;
       }
       break;
     }
-    if (action === "1") {
-      const value = await ask("Text source: ");
-      if (!value.trim()) {
-        console.log(ui.warning("Text cannot be empty."));
-        continue;
-      }
-      sources.push({ type: "text", value: value.trim() });
-      continue;
-    }
-    if (action === "2") {
-      const value = await ask("File path: ");
-      if (!value.trim()) {
-        console.log(ui.warning("File path cannot be empty."));
-        continue;
-      }
-      sources.push({ type: "file", value: value.trim() });
-      continue;
-    }
-    if (action === "3") {
-      const value = await ask("URL: ");
-      if (!value.trim()) {
-        console.log(ui.warning("URL cannot be empty."));
-        continue;
-      }
-      sources.push({ type: "url", value: value.trim() });
-      continue;
-    }
-    console.log(ui.warning("Please enter 1, 2, 3, or 4."));
+    inputs.push(normalized);
   }
 
-  return sources;
+  return inputs;
 }
 
 async function runInitWizard({
@@ -470,7 +442,7 @@ async function runInitWizard({
   let danceSlug: string | undefined;
   let customTalName: string | undefined;
   let customDanceName: string | undefined;
-  let customSources: CustomSource[] | undefined;
+  let customInputs: string[] | undefined;
   let comboName: string | undefined = defaultComboName?.trim() || undefined;
 
   try {
@@ -552,7 +524,7 @@ async function runInitWizard({
       console.log("");
       console.log(ui.step("Step 4: Choose source type"));
       console.log("  1) Preset catalog");
-      console.log("  2) Custom generate (text/file/url)");
+      console.log("  2) Custom generate (single unified input, auto-detect)");
       while (true) {
         const sourceInput = (await ask("Select 1-2 [1]: ")) || "1";
         if (sourceInput === "1") {
@@ -580,8 +552,8 @@ async function runInitWizard({
         }
       } else {
         console.log("");
-        console.log(ui.step("Step 5: Add custom sources"));
-        customSources = await collectCustomSources({ ask });
+        console.log(ui.step("Step 5: Add custom inputs"));
+        customInputs = await collectCustomInputs({ ask });
 
         console.log("");
         console.log(ui.step("Step 6: Name custom profile(s)"));
@@ -611,7 +583,7 @@ async function runInitWizard({
     if (danceSlug) console.log(`  Dance: ${danceSlug}`);
     if (customTalName) console.log(`  Custom Tal: ${customTalName}`);
     if (customDanceName) console.log(`  Custom Dance: ${customDanceName}`);
-    if (customSources?.length) console.log(`  Custom Sources: ${customSources.length}`);
+    if (customInputs?.length) console.log(`  Custom Inputs: ${customInputs.length}`);
     if (comboName) console.log(`  Name: ${comboName}`);
     const confirm = (await ask("Apply this setup? (Y/n): ")).toLowerCase();
     const cancelled = confirm === "n" || confirm === "no";
@@ -626,7 +598,7 @@ async function runInitWizard({
       danceSlug,
       customTalName,
       customDanceName,
-      customSources,
+      customInputs,
       comboName
     };
   } finally {
@@ -1196,7 +1168,7 @@ async function runInit(args: string[]) {
   let sourceType: InitWizardSourceType = "preset";
   let customTalName: string | undefined;
   let customDanceName: string | undefined;
-  let customSources: CustomSource[] | undefined;
+  let customInputs: string[] | undefined;
   const skipInteractive = hasFlag(args, "--no-interactive");
   const shouldRunWizard = !talSlug && !danceSlug && !skipInteractive && isInteractiveTty();
 
@@ -1222,7 +1194,7 @@ async function runInit(args: string[]) {
     sourceType = wizard.sourceType;
     customTalName = wizard.customTalName;
     customDanceName = wizard.customDanceName;
-    customSources = wizard.customSources;
+    customInputs = wizard.customInputs;
     comboName = comboName ?? wizard.comboName;
   }
 
@@ -1232,21 +1204,22 @@ async function runInit(args: string[]) {
   let customTal: Tal | null = null;
   let customDance: Dance | null = null;
 
-  if (sourceType === "custom" && customSources && customSources.length > 0) {
+  if (sourceType === "custom" && customInputs && customInputs.length > 0) {
+    const normalizedSources = await resolveUnifiedSources({ inputs: customInputs });
     const buildTal = shouldRunWizard ? Boolean(customTalName) : Boolean(talSlug);
     const buildDance = shouldRunWizard ? Boolean(customDanceName) : Boolean(danceSlug);
 
     const talResult = buildTal
       ? await buildCustomTal({
           name: customTalName ?? `${comboName ?? "Custom"} Tal`,
-          sources: customSources
+          sources: normalizedSources
         })
       : null;
 
     const danceResult = buildDance
       ? await buildCustomDance({
           name: customDanceName ?? `${comboName ?? "Custom"} Dance`,
-          sources: customSources
+          sources: normalizedSources
         })
       : null;
 
@@ -1428,7 +1401,7 @@ async function runCombo(args: string[]) {
   if (sub === "custom") {
     const comboName = readFlag(rest, "--name");
     if (!comboName) {
-      throw new Error("Usage: dot combo custom --name \"Founder Combo\" --text \"...\" [--file ...] [--url ...]");
+      throw new Error("Usage: dot combo custom --name \"Founder Combo\" --input \"...\" [--input \"...\"]");
     }
 
     const talOnly = hasFlag(rest, "--tal-only");
@@ -1446,11 +1419,8 @@ async function runCombo(args: string[]) {
     const talCategory = readFlag(rest, "--tal-category");
     const danceCategory = readFlag(rest, "--dance-category");
     const tags = parseCsv(readFlag(rest, "--tags"));
-    const sources = buildSourcesFromArgs(rest);
-
-    if (sources.length === 0) {
-      throw new Error("At least one source is required: --text, --file, or --url");
-    }
+    const inputs = buildInputsFromArgs(rest);
+    const sources = await resolveUnifiedSources({ inputs });
 
     const talResult = buildTal
       ? await buildCustomTal({

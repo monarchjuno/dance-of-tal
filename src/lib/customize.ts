@@ -34,6 +34,12 @@ export type BuildCustomDanceInput = {
   sources: CustomSource[];
 };
 
+export type UnifiedCustomInput = {
+  input?: string;
+  inputs?: string[];
+  sources?: CustomSource[];
+};
+
 const MAX_SOURCE_BYTES = 500_000;
 const MAX_MERGED_CHARS = 45_000;
 
@@ -221,6 +227,77 @@ const normalizeTag = (value: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+const isLikelyUrl = (value: string) => /^https?:\/\/\S+$/i.test(value.trim());
+
+const isLikelyFilePath = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("\n")) return false;
+  if (isLikelyUrl(trimmed)) return false;
+
+  if (/^(~\/|\/|\.{1,2}\/|[a-zA-Z]:[\\/])/.test(trimmed)) return true;
+  if (trimmed.includes("/") || trimmed.includes("\\")) return true;
+
+  const ext = path.extname(trimmed).toLowerCase();
+  return Boolean(ext && EXT_ALLOWLIST.has(ext));
+};
+
+const sanitizeInputLine = (value: string) => value.replace(/^[-*]\s+/, "").trim();
+
+const explodeInput = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => sanitizeInputLine(line))
+    .filter(Boolean);
+
+  if (lines.length < 2) return [trimmed];
+
+  const listLike = lines.every((line) => isLikelyUrl(line) || isLikelyFilePath(line));
+  return listLike ? lines : [trimmed];
+};
+
+const detectSourceType = async (value: string): Promise<SourceKind> => {
+  if (isLikelyUrl(value)) return "url";
+
+  if (isLikelyFilePath(value)) {
+    const resolvedPath = path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
+    try {
+      const info = await stat(resolvedPath);
+      if (info.isFile()) return "file";
+    } catch {
+      // Fall through to text when the path cannot be resolved.
+    }
+  }
+
+  return "text";
+};
+
+export const resolveUnifiedSources = async ({ input, inputs, sources }: UnifiedCustomInput) => {
+  if (sources && sources.length > 0) {
+    return sources;
+  }
+
+  const mergedInputs = [...(input ? [input] : []), ...(inputs ?? [])]
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .flatMap(explodeInput);
+
+  if (mergedInputs.length === 0) {
+    throw new Error("At least one input is required. Provide `input` or `inputs`.");
+  }
+
+  const normalized: CustomSource[] = [];
+  for (const value of mergedInputs) {
+    const type = await detectSourceType(value);
+    normalized.push({ type, value });
+  }
+
+  return normalized;
+};
 
 const resolveFileText = async (value: string) => {
   const rawPath = value.trim();

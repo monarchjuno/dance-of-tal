@@ -65,7 +65,7 @@ export const buildSetupModeAdvice = ({
       mode === "preset"
         ? ["Which category should I prioritize first?", "Use one preset combo now and refine later?"]
         : mode === "custom"
-          ? ["What source should I use first: text, file, or URL?", "Build custom Tal, Dance, or both?"]
+          ? ["Share one input (text, file path, URL, or mixed context).", "Build custom Tal, Dance, or both?"]
           : ["Pick a base preset first?", "Which layer should be customized first: Tal, Dance, or both?"];
 
     return {
@@ -98,7 +98,7 @@ export const buildSetupModeAdvice = ({
       reasons: [
         hasUserSources || sourceTypes.length > 0 ? "User-provided source signals detected." : "Custom-style intent detected from goal wording."
       ],
-      questions: ["Please share your source direction (text/file/url).", "Should I build custom Tal, custom Dance, or both?"],
+      questions: ["Please share one input (text, file path, URL, or mixed notes).", "Should I build custom Tal, custom Dance, or both?"],
       nextAction: "Collect minimal source inputs and build custom Tal/Dance before activation."
     };
   }
