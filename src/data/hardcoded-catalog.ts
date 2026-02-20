@@ -10920,12 +10920,98 @@ export const hardcodedDances: Dance[] = [
         "output": "Use a no-fluff value brief with simple numbers and clear tradeoffs."
       }
     ]
+  },
+  {
+    "slug": "korean-job-application-pre2023-proof",
+    "name": "Korean Job Application Natural Voice (Pre-2023)",
+    "description": "Korean application output pattern tuned for grounded, evidence-led, non-template prose inspired by successful pre-2023 writing conventions.",
+    "tone": [
+      "grounded",
+      "specific",
+      "professional",
+      "evidence-first"
+    ],
+    "structure": [
+      "role-fit thesis",
+      "context and challenge",
+      "actions and decisions",
+      "measurable outcome and next contribution"
+    ],
+    "formatting": [
+      "paragraph-first flow; bullets only for dense facts",
+      "state company/role context explicitly in first paragraph",
+      "anchor each claim to concrete project detail, metric, or owner",
+      "vary sentence length to avoid repetitive template cadence",
+      "use restrained punctuation; avoid decorative separators"
+    ],
+    "forbidden": [
+      "generic passion-only claims without evidence",
+      "copy-paste template transitions across paragraphs",
+      "dash-heavy separator chains and stacked parentheticals",
+      "inflated buzzwords without operational meaning",
+      "AI-sounding balanced symmetry in every sentence"
+    ],
+    "rhythm": "measured and human, with concrete detail before conclusion",
+    "examples": [
+      {
+        "input": "한화투자증권 RWA 부서 지원동기를 작성해줘.",
+        "output": "직무와 직접 연결된 실무 사례를 먼저 제시하고, 이후 90일 실행 계획을 구체 지표와 함께 제안한다."
+      },
+      {
+        "input": "가장 어려운 문제 해결 경험을 써줘.",
+        "output": "상황-판단-행동-결과를 실제 의사결정 기준 중심으로 작성하고, 배운 점을 다음 실행 원칙으로 연결한다."
+      }
+    ],
+    "category": "Writing"
+  },
+  {
+    "slug": "english-job-application-natural-voice-dance",
+    "name": "English Job Application Natural Voice (Pre-2023)",
+    "description": "English application output pattern for evidence-led, role-specific, and non-AI sounding prose based on practical pre-2023 cover-letter conventions.",
+    "tone": [
+      "grounded",
+      "direct",
+      "role-specific",
+      "credible"
+    ],
+    "structure": [
+      "fit thesis",
+      "high-signal evidence",
+      "execution pattern",
+      "near-term contribution plan"
+    ],
+    "formatting": [
+      "paragraph-first narrative with concise transitions",
+      "prioritize specific decisions, constraints, and results",
+      "include at least one concrete metric or operational outcome",
+      "mix sentence lengths for natural cadence",
+      "use punctuation discipline; keep separators minimal"
+    ],
+    "forbidden": [
+      "generic enthusiasm blocks with no proof",
+      "formulaic transition ladders repeated every paragraph",
+      "stacked em-dashes and ornamental punctuation patterns",
+      "buzzword clusters without role context",
+      "overly symmetric AI-template sentence shells"
+    ],
+    "rhythm": "natural editorial cadence with evidence before claims",
+    "examples": [
+      {
+        "input": "Write motivation and role fit for an RWA strategy role.",
+        "output": "Open with role-fit thesis, cite concrete cross-functional execution evidence, and close with a 30/60/90 contribution plan."
+      },
+      {
+        "input": "Describe a difficult problem-solving case.",
+        "output": "Frame a real decision conflict, explain what changed in your operating method, and quantify the outcome."
+      }
+    ],
+    "category": "Writing"
   }
 ];
 
 export const hardcodedRecommendedCombos: RecommendedCombos = {
   "schemaVersion": "1.2.0",
-  "updatedAt": "2026-02-19",
+  "updatedAt": "2026-02-20T00:05:59.418Z",
   "talToDance": {
     "elon-musk-case-tal": {
       "recommendedDanceCategories": [
@@ -11140,9 +11226,12 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
     "strategy-chief": {
       "recommendedDanceCategories": [
         "Executive",
-        "Product"
+        "Product",
+        "Writing"
       ],
       "recommendedDanceSlugs": [
+        "korean-job-application-pre2023-proof",
+        "english-job-application-natural-voice-dance",
         "boardroom-brief",
         "executive-one-page-brief-dance",
         "board-memo-decision-dance",
@@ -11206,6 +11295,8 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
         "Executive"
       ],
       "recommendedDanceSlugs": [
+        "korean-job-application-pre2023-proof",
+        "english-job-application-natural-voice-dance",
         "evidence-memo",
         "insight-synthesis-note-dance",
         "interview-findings-report-dance",
@@ -11290,6 +11381,8 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
         "Creator"
       ],
       "recommendedDanceSlugs": [
+        "korean-job-application-pre2023-proof",
+        "english-job-application-natural-voice-dance",
         "teaching-ladder",
         "lesson-plan-dance",
         "concept-explainer-dance",
@@ -11374,6 +11467,8 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
         "Executive"
       ],
       "recommendedDanceSlugs": [
+        "korean-job-application-pre2023-proof",
+        "english-job-application-natural-voice-dance",
         "minimal-copy",
         "crisp-executive-email-dance",
         "persuasive-proposal-dance",
@@ -11391,9 +11486,12 @@ export const hardcodedRecommendedCombos: RecommendedCombos = {
     "chief-of-staff-operator-tal": {
       "recommendedDanceCategories": [
         "Executive",
-        "Product"
+        "Product",
+        "Writing"
       ],
       "recommendedDanceSlugs": [
+        "korean-job-application-pre2023-proof",
+        "english-job-application-natural-voice-dance",
         "boardroom-brief",
         "executive-one-page-brief-dance",
         "board-memo-decision-dance",
