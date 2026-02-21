@@ -22,6 +22,38 @@ const unifiedInputFields = {
   sources: z.array(customSourceSchema).max(12).optional()
 };
 
+const stylePolicySchema = z.object({
+  referenceWindow: z
+    .object({
+      mode: z.enum(["any", "historical", "recent"]).optional(),
+      cutoffYear: z.number().int().min(1900).max(2100).optional()
+    })
+    .optional(),
+  expression: z
+    .object({
+      structure: z.enum(["paragraph", "hybrid", "list"]).optional(),
+      punctuationDiscipline: z.enum(["relaxed", "balanced", "strict"]).optional(),
+      templateStrictness: z.enum(["relaxed", "balanced", "strict"]).optional()
+    })
+    .optional(),
+  constraints: z
+    .object({
+      prefer: z.array(z.string().min(2)).max(12).optional(),
+      avoid: z.array(z.string().min(2)).max(12).optional()
+    })
+    .optional()
+});
+
+const stageSchema = z.enum(["generic", "gpts", "mcp", "openclaw", "threads"]);
+
+const stageContextSchema = z.object({
+  threadsAccessToken: z.string().min(1).optional(),
+  threadsUserId: z.string().min(1).optional(),
+  threadsBaseUrl: z.string().url().optional(),
+  threadsApiVersion: z.string().optional(),
+  threadsFetchLimit: z.number().int().min(1).max(20).optional()
+});
+
 const buildAutoInputPreview = ({
   input,
   inputs
@@ -158,16 +190,48 @@ export const registerCustomTools = ({
         tags: z.array(z.string()).optional(),
         description: z.string().optional(),
         goal: z.string().optional(),
+        stylePolicy: stylePolicySchema.optional(),
+        stage: stageSchema.optional(),
+        examples: z.array(z.string().min(1)).max(8).optional(),
+        stageContext: stageContextSchema.optional(),
         comboName: z.string().optional(),
         projectDir: z.string().optional(),
         persist: z.boolean().optional(),
         activate: z.boolean().optional(),
         ...unifiedInputFields
       },
-      async ({ name, category, tags, description, goal, comboName, projectDir, persist, activate, input, inputs, sources }) => {
+      async ({
+        name,
+        category,
+        tags,
+        description,
+        goal,
+        stylePolicy,
+        stage,
+        examples,
+        stageContext,
+        comboName,
+        projectDir,
+        persist,
+        activate,
+        input,
+        inputs,
+        sources
+      }) => {
         try {
           const normalizedSources = await resolveUnifiedSources({ input, inputs, sources });
-          const result = await buildCustomDance({ name, category, tags, description, goal, sources: normalizedSources });
+          const result = await buildCustomDance({
+            name,
+            category,
+            tags,
+            description,
+            goal,
+            stylePolicy,
+            stage,
+            examples,
+            stageContext,
+            sources: normalizedSources
+          });
           const storage = await persistCustomCombo({
             projectDir,
             comboName: comboName?.trim() || `${result.dance.name} Custom Combo`,
@@ -201,16 +265,48 @@ export const registerCustomTools = ({
         danceCategory: z.string().optional(),
         tags: z.array(z.string()).optional(),
         goal: z.string().optional(),
+        stylePolicy: stylePolicySchema.optional(),
+        stage: stageSchema.optional(),
+        examples: z.array(z.string().min(1)).max(8).optional(),
+        stageContext: stageContextSchema.optional(),
         comboName: z.string().optional(),
         projectDir: z.string().optional(),
         persist: z.boolean().optional(),
         activate: z.boolean().optional(),
         ...unifiedInputFields
       },
-      async ({ name, talCategory, danceCategory, tags, goal, comboName, projectDir, persist, activate, input, inputs, sources }) => {
+      async ({
+        name,
+        talCategory,
+        danceCategory,
+        tags,
+        goal,
+        stylePolicy,
+        stage,
+        examples,
+        stageContext,
+        comboName,
+        projectDir,
+        persist,
+        activate,
+        input,
+        inputs,
+        sources
+      }) => {
         try {
           const normalizedSources = await resolveUnifiedSources({ input, inputs, sources });
-          const result = await buildCustomTalDance({ name, talCategory, danceCategory, tags, goal, sources: normalizedSources });
+          const result = await buildCustomTalDance({
+            name,
+            talCategory,
+            danceCategory,
+            tags,
+            goal,
+            stylePolicy,
+            stage,
+            examples,
+            stageContext,
+            sources: normalizedSources
+          });
           const storage = await persistCustomCombo({
             projectDir,
             comboName: comboName?.trim() || `${name} Custom Combo`,
@@ -246,13 +342,35 @@ export const registerCustomTools = ({
         danceCategory: z.string().optional(),
         tags: z.array(z.string()).optional(),
         goal: z.string().optional(),
+        stylePolicy: stylePolicySchema.optional(),
+        stage: stageSchema.optional(),
+        examples: z.array(z.string().min(1)).max(8).optional(),
+        stageContext: stageContextSchema.optional(),
         comboName: z.string().optional(),
         projectDir: z.string().optional(),
         persist: z.boolean().optional(),
         activate: z.boolean().optional(),
         ...unifiedInputFields
       },
-      async ({ mode, name, talCategory, danceCategory, tags, goal, comboName, projectDir, persist, activate, input, inputs, sources }) => {
+      async ({
+        mode,
+        name,
+        talCategory,
+        danceCategory,
+        tags,
+        goal,
+        stylePolicy,
+        stage,
+        examples,
+        stageContext,
+        comboName,
+        projectDir,
+        persist,
+        activate,
+        input,
+        inputs,
+        sources
+      }) => {
         try {
           const effectiveMode = mode ?? "combo";
           const normalizedSources = await resolveUnifiedSources({ input, inputs, sources });
@@ -293,6 +411,10 @@ export const registerCustomTools = ({
               category: danceCategory,
               tags,
               goal,
+              stylePolicy,
+              stage,
+              examples,
+              stageContext,
               sources: normalizedSources
             });
             const storage = await persistCustomCombo({
@@ -322,6 +444,10 @@ export const registerCustomTools = ({
             danceCategory,
             tags,
             goal,
+            stylePolicy,
+            stage,
+            examples,
+            stageContext,
             sources: normalizedSources
           });
           const storage = await persistCustomCombo({

@@ -12,6 +12,7 @@ import {
   TalSummary
 } from "./types.js";
 import { hardcodedDances, hardcodedRecommendedCombos, hardcodedTals } from "./hardcoded-catalog.js";
+import { resolveDanceRules } from "../lib/dance-schema.js";
 
 type NeedHintRule = {
   id: string;
@@ -122,15 +123,18 @@ const talSummaries: TalSummary[] = tals.map((tal) => {
   };
 });
 
-const danceSummaries: DanceSummary[] = dances.map((dance) => ({
-  slug: dance.slug,
-  name: dance.name,
-  category: dance.category,
-  description: dance.description,
-  tone: dance.tone,
-  structure: dance.structure,
-  rhythm: dance.rhythm ?? null
-}));
+const danceSummaries: DanceSummary[] = dances.map((dance) => {
+  const rules = resolveDanceRules(dance);
+  return {
+    slug: dance.slug,
+    name: dance.name,
+    category: dance.category,
+    description: dance.description,
+    tone: rules.tone,
+    structure: rules.structure,
+    rhythm: rules.rhythm ?? null
+  };
+});
 
 const comboSummaries: ComboSummary[] = Object.entries(talToDance).flatMap(([talSlug, relation]) => {
   const tal = talBySlug.get(talSlug);
@@ -176,8 +180,8 @@ export const gptsDanceBriefs: GptsDanceBrief[] = dances.map((dance) => ({
   s: dance.slug,
   n: dance.name,
   c: dance.category,
-  t: dance.tone.slice(0, 2),
-  st: dance.structure.slice(0, 2),
+  t: resolveDanceRules(dance).tone.slice(0, 2),
+  st: resolveDanceRules(dance).structure.slice(0, 2),
   d: dance.description
 }));
 

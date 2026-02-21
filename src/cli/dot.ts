@@ -5,7 +5,14 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { Dance, Tal } from "../data/types.js";
 import { buildCustomDance, buildCustomTal, resolveUnifiedSources } from "../lib/customize.js";
+import { resolveDanceRules } from "../lib/dance-schema.js";
 import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal, listDances, listTals } from "../lib/persona.js";
+import {
+  publishThreadsText,
+  type ThreadsReplyControl
+} from "../lib/stages/threads.js";
+import { getProjectChannel, listProjectChannels, removeProjectChannel, upsertProjectChannel } from "./dot-channel-config.js";
+import { loadProjectDotEnv, readFirstEnv, readFirstEnvNumber, THREADS_ENV_KEYS } from "./project-env.js";
 import {
   clearActiveCombo,
   createComboFromRefs,
@@ -44,12 +51,14 @@ type SelectItem = {
 
 function printUsage() {
   const commandRows: Array<[string, string]> = [
+    ["dot pick tal|dance [filters]", "Pick a Tal or Dance from presets/custom items"],
+    ["dot lock --tal <slug> [--dance <slug>]", "Lock active Tal/Dance into current project"],
+    ["dot deploy --stage gpts|mcp|openclaw|threads", "Build channel-ready package from active Tal/Dance"],
     ["dot init [--project ...]", "Step-by-step setup wizard for .dance-of-tal config"],
     ["dot init --tal ... [--dance ...] [--name ...] [--target ...]", "Non-interactive init + optional starting combo"],
     ["dot setup ...", "Alias of dot init"],
     ["dot list tal|dance [filters]", "Browse preset data (add --include-custom to include saved custom items)"],
     ["dot show tal|dance <slug>", "Inspect one Tal or Dance"],
-    ["dot use --tal <slug> [--dance <slug>]", "Activate Tal-only, Dance-only, or Combo mode"],
     ["dot switch tal|dance|combo", "Switch active Tal/Dance/Combo with selection UX"],
     ["dot doctor [--project ...] [--target ...]", "Run host-connection diagnostics and setup hints"],
     ["dot current", "Show active mode and combo details"],
@@ -57,6 +66,7 @@ function printUsage() {
     ["dot run --task \"...\"", "Build task-ready SYSTEM + USER package from active mode"],
     ["dot combo list|show|use|rename", "Manage saved combos in this project"],
     ["dot combo custom --name ...", "Generate custom Tal/Dance and save as combo"],
+    ["dot channel list|show|connect|disconnect", "Manage per-project channel credentials in .dance-of-tal/channels.json"],
     ["dot clear", "Clear active combo"],
     ["dot config show|path", "Inspect config file location/content"]
   ];
@@ -80,12 +90,15 @@ function printUsage() {
       "  Apply Tal (thinking) and Dance (output) to AI behavior per project.",
       "",
       ui.section("Quick Start"),
-      `  1) ${ui.command("dot init")}`,
-      `  2) ${ui.command('dot use --tal elon-musk-case-tal --dance boardroom-brief --name "Founder Combo"')}`,
-      `  3) ${ui.command('dot run --task "Draft weekly board update"')}`,
+      `  1) ${ui.command("dot pick tal --query founder")}`,
+      `  2) ${ui.command('dot lock --tal elon-musk-case-tal --dance boardroom-brief --name "Founder Combo"')}`,
+      `  3) ${ui.command('dot deploy --stage mcp --task "Draft weekly board update"')}`,
       "",
       ui.section("Modes"),
       ...comboRows.map(([left, right]) => `  ${pad(left)}${right}`),
+      "",
+      ui.section("Flow"),
+      "  Pick -> Lock -> Deploy",
       "",
       ui.section("Commands"),
       ...commandRows.map(([left, right]) => `  ${ui.command(pad(left))}${right}`),
@@ -94,13 +107,18 @@ function printUsage() {
       `  ${ui.command('dot init --tal elon-musk-case-tal --name "Thinking Start"')}`,
       `  ${ui.command('dot init --tal elon-musk-case-tal --dance boardroom-brief --target openclaw --no-interactive')}`,
       `  ${ui.command("dot doctor --target windsurf")}`,
-      `  ${ui.command('dot use --dance boardroom-brief --name "Output Only"')}`,
+      `  ${ui.command('dot lock --dance boardroom-brief --name "Output Only"')}`,
       `  ${ui.command("dot switch tal")}`,
       `  ${ui.command('dot combo custom --name "My Custom" --tal-only --input "first principles and constraints"')}`,
+      `  ${ui.command('dot combo custom --name "Threads Voice" --dance-only --stage threads --example "Input => Output"')}`,
+      `  ${ui.command('dot channel connect threads --token "<TOKEN>" --meta userId="<THREADS_USER_ID>"')}`,
+      `  ${ui.command("dot channel connect threads   # token can come from .dance-of-tal/.env")}`,
+      `  ${ui.command('dot deploy --stage threads --publish --text "Launching private beta now."')}`,
       `  ${ui.command("dot list dance --category Executive --query concise")}`,
       "",
       ui.section("Project Config"),
       "  Stored at: .dance-of-tal/config.json",
+      "  Channel secrets: .dance-of-tal/channels.json",
       "  Init targets: windsurf | claude | openclaw | cursor | gpts | other",
       ""
     ].join("\n")
@@ -133,6 +151,30 @@ function readFlags(args: string[], flag: string) {
   }
   return values;
 }
+
+const parseMetadataFlags = (args: string[]) => {
+  const entries = readFlags(args, "--meta");
+  const metadata: Record<string, string> = {};
+  for (const entry of entries) {
+    const [keyRaw, ...valueParts] = entry.split("=");
+    const key = keyRaw?.trim();
+    const value = valueParts.join("=").trim();
+    if (!key || !value) continue;
+    metadata[key] = value;
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+};
+
+const readExamplesFromFlags = (args: string[]) =>
+  readFlags(args, "--example")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const maskSecret = (value?: string) => {
+  if (!value) return null;
+  if (value.length <= 8) return "*".repeat(value.length);
+  return `${value.slice(0, 4)}${"*".repeat(Math.max(4, value.length - 8))}${value.slice(-4)}`;
+};
 
 function buildInputsFromArgs(args: string[]) {
   const unifiedInputs = readFlags(args, "--input");
@@ -168,6 +210,7 @@ type InitWizardSelection = {
 };
 
 type SwitchTarget = "tal" | "dance" | "combo";
+type DeployStage = "gpts" | "mcp" | "openclaw" | "threads";
 
 type RefChoice = {
   id: string;
@@ -182,6 +225,24 @@ type DoctorCheck = {
   status: "pass" | "warn" | "fail";
   message: string;
   details?: string;
+};
+
+const isDeployStage = (value: string): value is DeployStage => {
+  return value === "gpts" || value === "mcp" || value === "openclaw" || value === "threads";
+};
+
+const isThreadsReplyControl = (value: string): value is ThreadsReplyControl => {
+  return value === "everyone" || value === "accounts_you_follow" || value === "mentioned_only";
+};
+
+const readChannelMetadataValue = (metadata: Record<string, string>, keys: string[]) => {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
 };
 
 const resolveTargetHost = (value?: string): InitTargetHost => {
@@ -805,16 +866,19 @@ async function runList(args: string[]) {
 
     const config = await readProjectConfig(projectDir);
     const custom = (config?.customDances ?? [])
-      .map((item) => ({
-        slug: item.dance.slug,
-        name: item.dance.name,
-        description: item.dance.description,
-        category: item.dance.category,
-        tone: item.dance.tone,
-        structure: item.dance.structure,
-        source: "custom" as const,
-        customId: item.id
-      }))
+      .map((item) => {
+        const rules = resolveDanceRules(item.dance);
+        return {
+          slug: item.dance.slug,
+          name: item.dance.name,
+          description: item.dance.description,
+          category: item.dance.category,
+          tone: rules.tone,
+          structure: rules.structure,
+          source: "custom" as const,
+          customId: item.id
+        };
+      })
       .filter((item) => {
         const q = query?.toLowerCase().trim();
         const matchQuery = !q || [item.name, item.description, item.category, ...item.tone, ...item.structure].join(" ").toLowerCase().includes(q);
@@ -882,7 +946,7 @@ async function runUse(args: string[]) {
   const projectDir = readProjectArg(args);
 
   if (!talSlug && !danceSlug) {
-    throw new Error("Usage: dot use <tal-slug> [--dance <dance-slug>] OR dot use --tal <tal-slug> OR dot use --dance <dance-slug>");
+    throw new Error("Usage: dot lock <tal-slug> [--dance <dance-slug>] OR dot lock --tal <tal-slug> OR dot lock --dance <dance-slug>");
   }
 
   const tal = talSlug ? findTal(talSlug) : null;
@@ -967,7 +1031,7 @@ async function runSwitch(args: string[]) {
   if (target === "combo") {
     const combos = config.combos;
     if (combos.length === 0) {
-      throw new Error("No saved combos yet. Create one with dot use ... or dot combo custom ...");
+      throw new Error("No saved combos yet. Create one with dot lock ... or dot combo custom ...");
     }
 
     const comboIdFromFlag = readFlag(rest, "--id");
@@ -1106,7 +1170,7 @@ async function runCurrent(args: string[]) {
     console.log(
       JSON.stringify(
         {
-          message: "No active combo in this project. Run: dot use ... or dot combo custom ...",
+          message: "No active combo in this project. Run: dot lock ... or dot combo custom ...",
           projectDir,
           configPath,
           activeCombo: null
@@ -1258,7 +1322,7 @@ async function runInit(args: string[]) {
   if (!activeCombo) {
     nextSteps.push("dot list tal");
     nextSteps.push("dot list dance");
-    nextSteps.push("dot use --tal <tal-slug> [--dance <dance-slug>] --name \"My Combo\"");
+    nextSteps.push("dot lock --tal <tal-slug> [--dance <dance-slug>] --name \"My Combo\"");
   } else {
     nextSteps.push("dot current");
     nextSteps.push("dot run --task \"Describe your real task\"");
@@ -1296,7 +1360,7 @@ async function runPrompt(args: string[]) {
   const projectDir = readProjectArg(args);
   const resolved = await getResolvedActiveCombo(projectDir);
   if (!resolved) {
-    throw new Error("No active combo in project config. Run: dot use ... or dot combo custom ...");
+    throw new Error("No active combo in project config. Run: dot lock ... or dot combo custom ...");
   }
 
   console.log(buildPromptFromSelection({ tal: resolved.tal, dance: resolved.dance, mode: modeRaw }));
@@ -1307,10 +1371,183 @@ async function runRun(args: string[]) {
   const projectDir = readProjectArg(args);
   const resolved = await getResolvedActiveCombo(projectDir);
   if (!resolved) {
-    throw new Error("No active combo in this project. Run: dot use ... or dot combo custom ...");
+    throw new Error("No active combo in this project. Run: dot lock ... or dot combo custom ...");
   }
 
   console.log(buildRunPackageFromSelection({ tal: resolved.tal, dance: resolved.dance, task }));
+}
+
+async function runPick(args: string[]) {
+  const target = args[0];
+  if (!target) {
+    throw new Error("Usage: dot pick tal|dance [filters] | dot pick combo");
+  }
+
+  if (target === "tal" || target === "dance") {
+    await runList(args);
+    return;
+  }
+
+  if (target === "combo") {
+    await runCombo(["list", ...args.slice(1)]);
+    return;
+  }
+
+  throw new Error("Usage: dot pick tal|dance [filters] | dot pick combo");
+}
+
+async function runLock(args: string[]) {
+  if (args[0] === "switch") {
+    await runSwitch(args.slice(1));
+    return;
+  }
+  await runUse(args);
+}
+
+async function runDeploy(args: string[]) {
+  const stageRaw = (readFlag(args, "--stage") ?? readFlag(args, "--to") ?? args[0] ?? "").trim().toLowerCase();
+  if (!stageRaw || !isDeployStage(stageRaw)) {
+    throw new Error(
+      "Usage: dot deploy --stage gpts|mcp|openclaw|threads [--task \"...\"] [--text \"...\"] [--publish] [--project /path]"
+    );
+  }
+
+  const stage = stageRaw;
+  const task = readFlag(args, "--task") ?? "Describe your task here.";
+  const deployText = readFlag(args, "--text");
+  const publish = hasFlag(args, "--publish") && !hasFlag(args, "--dry-run");
+  const projectDir = readProjectArg(args);
+  const resolved = await getResolvedActiveCombo(projectDir);
+  if (!resolved) {
+    throw new Error("No active combo in this project. Run: dot lock --tal <slug> [--dance <slug>]");
+  }
+
+  const combinedPrompt = buildPromptFromSelection({ tal: resolved.tal, dance: resolved.dance, mode: "combined" });
+  const runPackage = buildRunPackageFromSelection({ tal: resolved.tal, dance: resolved.dance, task });
+  const stageResult: Record<string, unknown> = {
+    stage,
+    projectDir,
+    activeCombo: {
+      id: resolved.combo.id,
+      name: resolved.combo.name,
+      mode: resolved.tal && resolved.dance ? "combo" : resolved.tal ? "tal-only" : "dance-only"
+    }
+  };
+
+  if (stage === "gpts") {
+    stageResult.instructions = combinedPrompt;
+    stageResult.starter = task;
+    stageResult.nextSteps = [
+      "Open your GPTs configuration.",
+      "Paste `instructions` into the system/instructions section.",
+      "Set a conversation starter similar to `starter`."
+    ];
+  } else if (stage === "mcp") {
+    stageResult.package = runPackage;
+    stageResult.command = `dot run --task ${JSON.stringify(task)} --project ${JSON.stringify(projectDir)}`;
+    stageResult.nextSteps = [
+      "Run the command to build a task package.",
+      "Pass SYSTEM/USER blocks into your MCP host execution flow."
+    ];
+  } else if (stage === "openclaw") {
+    stageResult.systemPrompt = combinedPrompt;
+    stageResult.openclawHint =
+      "Use MCP tool `build_openclaw_profile` for production profile payload, then paste system prompt into OpenClaw assistant profile.";
+    stageResult.nextSteps = [
+      "Run build_openclaw_profile with selected Tal/Dance.",
+      "Apply returned profile/system prompt in openclaw.ai assistant settings."
+    ];
+  } else if (stage === "threads") {
+    const channel = await getProjectChannel({ projectDir, name: "threads" });
+    const channelMetadata = channel.channel?.metadata ?? {};
+    const projectEnv = await loadProjectDotEnv(projectDir);
+    const envToken = readFirstEnv({ keys: [...THREADS_ENV_KEYS.accessToken], projectEnv: projectEnv.values });
+    const envUserId = readFirstEnv({ keys: [...THREADS_ENV_KEYS.userId], projectEnv: projectEnv.values });
+    const envBaseUrl = readFirstEnv({ keys: [...THREADS_ENV_KEYS.baseUrl], projectEnv: projectEnv.values });
+    const envApiVersion = readFirstEnv({ keys: [...THREADS_ENV_KEYS.apiVersion], projectEnv: projectEnv.values });
+
+    const resolvedToken = channel.channel?.auth.token?.trim() || envToken;
+    const resolvedMetadata = channelMetadata;
+
+    const outputRules = buildPromptFromSelection({ tal: resolved.tal, dance: resolved.dance, mode: "output" });
+    const metadataUserId = readChannelMetadataValue(resolvedMetadata, [
+      "userId",
+      "user_id",
+      "threadsUserId",
+      "threads_user_id"
+    ]);
+    const userIdFlag = readFlag(args, "--threads-user-id") ?? readFlag(args, "--user-id");
+    const userId = userIdFlag?.trim() || metadataUserId || envUserId;
+    const replyControlRaw = (readFlag(args, "--reply-control") ?? "").trim();
+    const replyControl = replyControlRaw ? (isThreadsReplyControl(replyControlRaw) ? replyControlRaw : null) : undefined;
+    if (replyControlRaw && !replyControl) {
+      throw new Error("--reply-control must be one of: everyone, accounts_you_follow, mentioned_only");
+    }
+
+    stageResult.hasChannelToken = Boolean(resolvedToken);
+    stageResult.hasChannelApiKey = Boolean(channel.channel?.auth.apiKey);
+    stageResult.channelMetadata = resolvedMetadata;
+    stageResult.postBrief = {
+      topic: deployText ?? task,
+      styleRules: outputRules,
+      writeInstruction: "Create one high-engagement Korean Threads post following these style rules."
+    };
+    stageResult.publishReady = Boolean(resolvedToken && userId);
+    stageResult.nextSteps = [
+      "Generate 3 post variants using `postBrief`.",
+      "Publish directly: dot deploy --stage threads --publish --text \"...\" [--user-id ...]",
+      "Record reactions and feed top posts back into Tal/Dance refinement."
+    ];
+
+    if (publish) {
+      const accessToken = resolvedToken;
+      if (!accessToken) {
+        throw new Error(
+          "Threads token is not set. Use dot channel connect threads --token \"<TOKEN>\" or set DANCE_OF_TAL_THREADS_ACCESS_TOKEN in .dance-of-tal/.env."
+        );
+      }
+      if (!userId) {
+        throw new Error(
+          "Threads user id is missing. Provide --user-id, save metadata with dot channel connect threads --meta userId=\"<THREADS_USER_ID>\", or set DANCE_OF_TAL_THREADS_USER_ID in .dance-of-tal/.env."
+        );
+      }
+      const text = (deployText ?? task).trim();
+      if (!text) {
+        throw new Error("Threads publish requires text. Set --text \"...\" or --task \"...\".");
+      }
+
+      const published = await publishThreadsText({
+        accessToken,
+        userId,
+        text,
+        replyControl,
+        baseUrl: readFlag(args, "--threads-base-url") ?? resolvedMetadata.threadsBaseUrl ?? envBaseUrl,
+        apiVersion: readFlag(args, "--threads-api-version") ?? envApiVersion
+      });
+
+      stageResult.publish = {
+        enabled: true,
+        userId,
+        text,
+        replyControl: replyControl ?? "default",
+        containerId: published.containerId,
+        postId: published.publishedId
+      };
+      stageResult.nextSteps = [
+        "Published via Threads Graph API.",
+        "Save the best-performing post data and tune Tal/Dance from engagement signals."
+      ];
+    } else {
+      stageResult.publish = {
+        enabled: false,
+        reason: "Preview mode. Add --publish to post directly.",
+        exampleCommand:
+          "dot deploy --stage threads --publish --text \"<your post>\" [--user-id <THREADS_USER_ID>] [--reply-control everyone|accounts_you_follow|mentioned_only]"
+      };
+    }
+  }
+
+  console.log(JSON.stringify(stageResult, null, 2));
 }
 
 async function runCombo(args: string[]) {
@@ -1401,7 +1638,9 @@ async function runCombo(args: string[]) {
   if (sub === "custom") {
     const comboName = readFlag(rest, "--name");
     if (!comboName) {
-      throw new Error("Usage: dot combo custom --name \"Founder Combo\" --input \"...\" [--input \"...\"]");
+      throw new Error(
+        "Usage: dot combo custom --name \"Founder Combo\" --input \"...\" [--example \"Input => Output\"] [--stage threads]"
+      );
     }
 
     const talOnly = hasFlag(rest, "--tal-only");
@@ -1418,9 +1657,48 @@ async function runCombo(args: string[]) {
     const goal = readFlag(rest, "--goal");
     const talCategory = readFlag(rest, "--tal-category");
     const danceCategory = readFlag(rest, "--dance-category");
+    const stage = readFlag(rest, "--stage");
     const tags = parseCsv(readFlag(rest, "--tags"));
+    const examples = readExamplesFromFlags(rest);
     const inputs = buildInputsFromArgs(rest);
     const sources = await resolveUnifiedSources({ inputs });
+    let stageContext:
+      | {
+          threadsAccessToken?: string;
+          threadsUserId?: string;
+          threadsBaseUrl?: string;
+          threadsApiVersion?: string;
+          threadsFetchLimit?: number;
+        }
+      | undefined;
+
+    if (stage?.trim().toLowerCase() === "threads") {
+      const channel = await getProjectChannel({ projectDir, name: "threads" });
+      const metadata = channel.channel?.metadata ?? {};
+      const projectEnv = await loadProjectDotEnv(projectDir);
+      const envToken = readFirstEnv({ keys: [...THREADS_ENV_KEYS.accessToken], projectEnv: projectEnv.values });
+      const envUserId = readFirstEnv({ keys: [...THREADS_ENV_KEYS.userId], projectEnv: projectEnv.values });
+      const envBaseUrl = readFirstEnv({ keys: [...THREADS_ENV_KEYS.baseUrl], projectEnv: projectEnv.values });
+      const envApiVersion = readFirstEnv({ keys: [...THREADS_ENV_KEYS.apiVersion], projectEnv: projectEnv.values });
+      const envFetchLimit = readFirstEnvNumber({
+        keys: [...THREADS_ENV_KEYS.fetchLimit],
+        projectEnv: projectEnv.values,
+        min: 1,
+        max: 20
+      });
+      const metaUserId = readChannelMetadataValue(metadata, ["userId", "user_id", "threadsUserId", "threads_user_id"]);
+      const threadsUserId = readFlag(rest, "--threads-user-id") ?? readFlag(rest, "--user-id") ?? metaUserId ?? envUserId;
+      const threadsAccessToken = readFlag(rest, "--threads-token") ?? channel.channel?.auth.token?.trim() ?? envToken;
+      if (threadsAccessToken || threadsUserId) {
+        stageContext = {
+          threadsAccessToken: threadsAccessToken?.trim(),
+          threadsUserId: threadsUserId?.trim(),
+          threadsBaseUrl: readFlag(rest, "--threads-base-url") ?? metadata.threadsBaseUrl ?? envBaseUrl,
+          threadsApiVersion: readFlag(rest, "--threads-api-version") ?? metadata.threadsApiVersion ?? envApiVersion,
+          threadsFetchLimit: Number(readFlag(rest, "--threads-limit") ?? "0") || envFetchLimit
+        };
+      }
+    }
 
     const talResult = buildTal
       ? await buildCustomTal({
@@ -1438,7 +1716,10 @@ async function runCombo(args: string[]) {
           category: danceCategory,
           tags,
           goal,
-          sources
+          sources,
+          stage: stage as "generic" | "gpts" | "mcp" | "openclaw" | "threads" | undefined,
+          examples,
+          stageContext
         })
       : null;
 
@@ -1462,6 +1743,8 @@ async function runCombo(args: string[]) {
           mode: talResult && danceResult ? "combo" : talResult ? "tal-only" : "dance-only",
           customTal: talResult?.tal ?? null,
           customDance: danceResult?.dance ?? null,
+          talExtraction: talResult?.extraction ?? null,
+          danceExtraction: danceResult?.extraction ?? null,
           talSourceDigest: talResult?.sourceDigest ?? null,
           danceSourceDigest: danceResult?.sourceDigest ?? null
         },
@@ -1473,6 +1756,155 @@ async function runCombo(args: string[]) {
   }
 
   throw new Error("Usage: dot combo list|show|use|rename|custom ...");
+}
+
+async function runChannel(args: string[]) {
+  const sub = args[0];
+
+  if (sub === "list") {
+    const projectDir = readProjectArg(args.slice(1));
+    const result = await listProjectChannels(projectDir);
+    console.log(
+      JSON.stringify(
+        {
+          projectDir: result.projectDir,
+          channelsPath: result.channelsPath,
+          count: result.items.length,
+          items: result.items.map((item) => ({
+            name: item.name,
+            enabled: item.enabled,
+            connectedAt: item.connectedAt,
+            updatedAt: item.updatedAt,
+            hasToken: Boolean(item.auth.token),
+            hasApiKey: Boolean(item.auth.apiKey),
+            metadata: item.metadata ?? {}
+          }))
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (sub === "show") {
+    const name = args[1];
+    if (!name) throw new Error("Usage: dot channel show <name> [--reveal] [--project /path]");
+    const rest = args.slice(2);
+    const projectDir = readProjectArg(rest);
+    const reveal = hasFlag(rest, "--reveal");
+    const result = await getProjectChannel({ projectDir, name });
+    if (!result.channel) {
+      throw new Error(`Channel not found: ${name}`);
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          projectDir: result.projectDir,
+          channelsPath: result.channelsPath,
+          channel: {
+            name: result.channel.name,
+            enabled: result.channel.enabled,
+            connectedAt: result.channel.connectedAt,
+            updatedAt: result.channel.updatedAt,
+            auth: {
+              token: reveal ? result.channel.auth.token ?? null : maskSecret(result.channel.auth.token),
+              apiKey: reveal ? result.channel.auth.apiKey ?? null : maskSecret(result.channel.auth.apiKey)
+            },
+            metadata: result.channel.metadata ?? {}
+          }
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (sub === "connect" || sub === "set") {
+    const name = args[1];
+    if (!name) throw new Error("Usage: dot channel connect <name> [--token <value>] [--meta k=v] [--project /path]");
+    const rest = args.slice(2);
+    const projectDir = readProjectArg(rest);
+    const projectEnv = await loadProjectDotEnv(projectDir);
+    const envThreadsToken = readFirstEnv({ keys: [...THREADS_ENV_KEYS.accessToken], projectEnv: projectEnv.values });
+    const envThreadsUserId = readFirstEnv({ keys: [...THREADS_ENV_KEYS.userId], projectEnv: projectEnv.values });
+
+    const token = readFlag(rest, "--token") ?? (name.toLowerCase() === "threads" ? envThreadsToken : undefined);
+    const apiKey = readFlag(rest, "--api-key");
+    if (!token && !apiKey) {
+      throw new Error(
+        "Provide --token or --api-key. For Threads, you can also set DANCE_OF_TAL_THREADS_ACCESS_TOKEN in .dance-of-tal/.env."
+      );
+    }
+
+    const metadataFlags = parseMetadataFlags(rest) ?? {};
+    if (name.toLowerCase() === "threads" && !metadataFlags.userId && envThreadsUserId) {
+      metadataFlags.userId = envThreadsUserId;
+    }
+    const metadata = Object.keys(metadataFlags).length > 0 ? metadataFlags : undefined;
+
+    const result = await upsertProjectChannel({
+      projectDir,
+      name,
+      token: token?.trim(),
+      apiKey: apiKey?.trim(),
+      metadata
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          message: "Channel credentials saved.",
+          projectDir: result.projectDir,
+          channelsPath: result.channelsPath,
+          channel: {
+            name: result.channel.name,
+            enabled: result.channel.enabled,
+            connectedAt: result.channel.connectedAt,
+            updatedAt: result.channel.updatedAt,
+            hasToken: Boolean(result.channel.auth.token),
+            hasApiKey: Boolean(result.channel.auth.apiKey),
+            metadata: result.channel.metadata ?? {}
+          }
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (sub === "disconnect" || sub === "remove" || sub === "clear") {
+    const name = args[1];
+    if (!name) throw new Error("Usage: dot channel disconnect <name> [--project /path]");
+    const rest = args.slice(2);
+    const projectDir = readProjectArg(rest);
+    const result = await removeProjectChannel({ projectDir, name });
+    console.log(
+      JSON.stringify(
+        {
+          message: result.removed ? "Channel removed." : "Channel was not found.",
+          projectDir: result.projectDir,
+          channelsPath: result.channelsPath,
+          removed: result.removed,
+          channel: result.channel
+            ? {
+                name: result.channel.name,
+                hadToken: Boolean(result.channel.auth.token),
+                hadApiKey: Boolean(result.channel.auth.apiKey)
+              }
+            : null
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  throw new Error("Usage: dot channel list|show|connect|disconnect ...");
 }
 
 async function runConfig(args: string[]) {
@@ -1548,7 +1980,7 @@ async function runDoctor(args: string[]) {
       id: "active-combo",
       status: "warn",
       message: "No active combo set",
-      details: "Run: dot use --tal <slug> [--dance <slug>]"
+      details: "Run: dot lock --tal <slug> [--dance <slug>]"
     });
   }
 
@@ -1622,13 +2054,18 @@ async function main() {
     return;
   }
 
+  if (command === "pick") {
+    await runPick(args);
+    return;
+  }
+
   if (command === "show") {
     await runShow(args);
     return;
   }
 
-  if (command === "use") {
-    await runUse(args);
+  if (command === "lock") {
+    await runLock(args);
     return;
   }
 
@@ -1639,6 +2076,11 @@ async function main() {
 
   if (command === "run") {
     await runRun(args);
+    return;
+  }
+
+  if (command === "deploy") {
+    await runDeploy(args);
     return;
   }
 
@@ -1669,6 +2111,11 @@ async function main() {
 
   if (command === "combo") {
     await runCombo(args);
+    return;
+  }
+
+  if (command === "channel") {
+    await runChannel(args);
     return;
   }
 

@@ -1,6 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { Dance, Tal } from "../data/types.js";
+import { Dance, DanceStyleExample, Tal } from "../data/types.js";
+import { resolveDanceExamples, resolveDanceRules } from "./dance-schema.js";
+import { fetchThreadsRecentTexts } from "./stages/threads.js";
 
 export type SourceKind = "text" | "file" | "url";
 
@@ -32,6 +34,32 @@ export type BuildCustomDanceInput = {
   description?: string;
   goal?: string;
   sources: CustomSource[];
+  stylePolicy?: DanceStylePolicy;
+  stage?: "generic" | "gpts" | "mcp" | "openclaw" | "threads";
+  examples?: Array<string | { input?: string; output?: string; label?: string; notes?: string }>;
+  stageContext?: {
+    threadsAccessToken?: string;
+    threadsUserId?: string;
+    threadsBaseUrl?: string;
+    threadsApiVersion?: string;
+    threadsFetchLimit?: number;
+  };
+};
+
+export type DanceStylePolicy = {
+  referenceWindow?: {
+    mode?: "any" | "historical" | "recent";
+    cutoffYear?: number;
+  };
+  expression?: {
+    structure?: "paragraph" | "hybrid" | "list";
+    punctuationDiscipline?: "relaxed" | "balanced" | "strict";
+    templateStrictness?: "relaxed" | "balanced" | "strict";
+  };
+  constraints?: {
+    prefer?: string[];
+    avoid?: string[];
+  };
 };
 
 export type UnifiedCustomInput = {
@@ -40,8 +68,19 @@ export type UnifiedCustomInput = {
   sources?: CustomSource[];
 };
 
+const DEFAULT_STAGE = "generic" as const;
+
+const normalizeStage = (value?: string): BuildCustomDanceInput["stage"] => {
+  const normalized = (value ?? DEFAULT_STAGE).trim().toLowerCase();
+  if (normalized === "gpts" || normalized === "mcp" || normalized === "openclaw" || normalized === "threads") {
+    return normalized;
+  }
+  return "generic";
+};
+
 const MAX_SOURCE_BYTES = 500_000;
 const MAX_MERGED_CHARS = 45_000;
+const DEFAULT_EXAMPLE_LIMIT = 20;
 
 const STOP_WORDS = new Set([
   "the",
@@ -131,8 +170,14 @@ const cleanText = (text: string) =>
   text
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 
 const splitSentences = (text: string) =>
@@ -222,6 +267,56 @@ const inferRhythm = (text: string) => {
   return "clear and steady";
 };
 
+const inferStylePolicy = (text: string, goal?: string): DanceStylePolicy => {
+  const lower = `${text}\n${goal ?? ""}`.toLowerCase();
+  const historicalSignal =
+    /(before\s+\d{4}|pre[-\s]?\d{4}|historical|classic|legacy|ai\s*이전|이전\s*자료|archival)/.test(lower) ||
+    /(cover letter|job application|resume|personal statement|자기소개서|입사\s*지원)/.test(lower);
+  const recentSignal = /(latest|current|trend|up[-\s]?to[-\s]?date|recent\s+years|최신|최근)/.test(lower);
+  const paragraphSignal = /(paragraph|문단|letter form|essay style|자연스러운 문장 흐름)/.test(lower);
+  const listSignal = /(bullet|list|checklist|outline|표 형태|목록)/.test(lower);
+  const punctuationStrictSignal = /(punctuation|dash|hyphen|separator|대시|하이픈|문장부호)/.test(lower);
+  const templateStrictSignal = /(human[-\s]?written|natural voice|non[-\s]?ai|avoid ai|authentic|자연스러운 문체|ai스럽지)/.test(lower);
+
+  return {
+    referenceWindow: {
+      mode: historicalSignal ? "historical" : recentSignal ? "recent" : "any"
+    },
+    expression: {
+      structure: paragraphSignal ? "paragraph" : listSignal ? "list" : "hybrid",
+      punctuationDiscipline: punctuationStrictSignal ? "strict" : "balanced",
+      templateStrictness: templateStrictSignal ? "strict" : "balanced"
+    }
+  };
+};
+
+const normalizeRuleList = (items?: string[]) =>
+  (items ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+const mergeStylePolicy = (inferred: DanceStylePolicy, user?: DanceStylePolicy): DanceStylePolicy => {
+  const merged: DanceStylePolicy = {
+    referenceWindow: {
+      mode: user?.referenceWindow?.mode ?? inferred.referenceWindow?.mode ?? "any",
+      cutoffYear: user?.referenceWindow?.cutoffYear
+    },
+    expression: {
+      structure: user?.expression?.structure ?? inferred.expression?.structure ?? "hybrid",
+      punctuationDiscipline:
+        user?.expression?.punctuationDiscipline ?? inferred.expression?.punctuationDiscipline ?? "balanced",
+      templateStrictness:
+        user?.expression?.templateStrictness ?? inferred.expression?.templateStrictness ?? "balanced"
+    },
+    constraints: {
+      prefer: normalizeRuleList([...(user?.constraints?.prefer ?? [])]),
+      avoid: normalizeRuleList([...(user?.constraints?.avoid ?? [])])
+    }
+  };
+  return merged;
+};
+
 const normalizeTag = (value: string) =>
   value
     .toLowerCase()
@@ -297,6 +392,180 @@ export const resolveUnifiedSources = async ({ input, inputs, sources }: UnifiedC
   }
 
   return normalized;
+};
+
+const parseManualExample = (
+  source: string | { input?: string; output?: string; label?: string; notes?: string }
+): DanceStyleExample | null => {
+  if (typeof source === "object") {
+    const input = source.input?.trim() ?? "";
+    const output = source.output?.trim() ?? "";
+    if (!input || !output) return null;
+    return {
+      input,
+      output,
+      label: source.label?.trim() || undefined,
+      notes: source.notes?.trim() || undefined
+    };
+  }
+
+  const raw = source.trim().replace(/\\n/g, "\n");
+  if (!raw) return null;
+
+  const arrowIdx = raw.indexOf("=>");
+  if (arrowIdx > 0) {
+    const left = raw.slice(0, arrowIdx).trim();
+    const right = raw.slice(arrowIdx + 2).trim();
+    if (left && right) return { input: left, output: right, label: "Manual" };
+  }
+
+  const ioMatch = raw.match(/input\s*:\s*([\s\S]*?)\n+\s*output\s*:\s*([\s\S]*)/i);
+  if (ioMatch) {
+    const input = ioMatch[1]?.trim() ?? "";
+    const output = ioMatch[2]?.trim() ?? "";
+    if (input && output) return { input, output, label: "Manual" };
+  }
+
+  const parts = raw.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      input: parts[0],
+      output: parts.slice(1).join("\n\n"),
+      label: "Manual"
+    };
+  }
+
+  return {
+    input: "Apply this style to the current task.",
+    output: raw,
+    label: "Manual output sample"
+  };
+};
+
+const extractInlineExamplesFromText = (text: string): DanceStyleExample[] => {
+  const matches = Array.from(text.matchAll(/input\s*:\s*([\s\S]*?)\n+\s*output\s*:\s*([\s\S]*?)(?=\n+\s*input\s*:|$)/gi));
+  if (matches.length === 0) return [];
+
+  return matches
+    .map((match) => {
+      const input = match[1]?.trim() ?? "";
+      const output = match[2]?.trim() ?? "";
+      if (!input || !output) return null;
+      return {
+        input,
+        output,
+        label: "Auto parsed"
+      } satisfies DanceStyleExample;
+    })
+    .filter((item): item is DanceStyleExample => Boolean(item))
+    .slice(0, 4);
+};
+
+const extractNumberedPostExamplesFromText = (text: string, goal?: string): DanceStyleExample[] => {
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const headerRegex = /(?:^|\n)\s*게시글\s*(\d+)[^\n]*\n/gi;
+  const headers = Array.from(normalized.matchAll(headerRegex));
+  if (headers.length === 0) return [];
+
+  const examples: DanceStyleExample[] = [];
+  const subject = goal?.trim() || "제공된 게시글 스타일";
+
+  for (let i = 0; i < headers.length; i += 1) {
+    const match = headers[i];
+    const number = match[1];
+    const start = (match.index ?? 0) + match[0].length;
+    const end = i + 1 < headers.length ? (headers[i + 1].index ?? normalized.length) : normalized.length;
+    const block = normalized.slice(start, end).trim();
+    if (!block) continue;
+
+    examples.push({
+      label: "Numbered post sample",
+      input: `${subject} (게시글 ${number})`,
+      output: block
+    });
+  }
+
+  return examples;
+};
+
+const applyStageRuleTuning = ({
+  stage,
+  tone,
+  structure,
+  formatting,
+  forbidden
+}: {
+  stage: NonNullable<BuildCustomDanceInput["stage"]>;
+  tone: string[];
+  structure: string[];
+  formatting: string[];
+  forbidden: string[];
+}) => {
+  if (stage === "threads") {
+    tone.push("conversational", "attention-first");
+    structure.push("hook in first line", "single message thread", "one clear CTA");
+    formatting.push("short line cadence with deliberate line breaks", "prefer concrete claim + proof + CTA");
+    forbidden.push("hashtag spam", "multi-topic dump", "long preamble");
+    return "hook -> proof -> CTA";
+  }
+
+  if (stage === "gpts") {
+    formatting.push("optimize for instruction-following consistency across long chats");
+    forbidden.push("style drift across turns");
+    return "consistent multi-turn cadence";
+  }
+
+  if (stage === "mcp" || stage === "openclaw") {
+    formatting.push("keep outputs deterministic and tool-friendly");
+    forbidden.push("ambiguous output wrappers that break downstream parsing");
+    return "structured and parseable";
+  }
+
+  return undefined;
+};
+
+const buildGeneratedExamples = ({
+  stage,
+  goal,
+  keywords,
+  structure
+}: {
+  stage: NonNullable<BuildCustomDanceInput["stage"]>;
+  goal?: string;
+  keywords: string[];
+  structure: string[];
+}): DanceStyleExample[] => {
+  const subject = goal?.trim() || keywords.slice(0, 2).join(" + ") || "the task";
+
+  if (stage === "threads") {
+    return [
+      {
+        label: "Stage auto",
+        input: `Write a Threads post about ${subject}.`,
+        output: `Most teams ship features. Few ship outcomes.\n\nThis week we cut one bottleneck in ${subject} and recovered real velocity.\n\nIf you're stuck, pick one metric, one owner, one deadline.`,
+        notes: "Threads format: hook, proof, CTA."
+      },
+      {
+        label: "Stage auto",
+        input: `Announce a progress update for ${subject}.`,
+        output: `Quick build log:\n1) Constraint we hit\n2) Fix we shipped\n3) Next checkpoint\n\nSmall loops beat big promises.`,
+        notes: "Compact line rhythm."
+      }
+    ];
+  }
+
+  return [
+    {
+      label: "Auto generated",
+      input: `Produce a response for ${subject}.`,
+      output: `Context: define the operating constraint.\nCore: present the key move using ${structure[0] ?? "clear structure"}.\nAction: close with one owner and one measurable checkpoint.`
+    },
+    {
+      label: "Auto generated",
+      input: "Rewrite this draft in the configured style.",
+      output: "Preserve intent, tighten structure, remove vague claims, and end with executable next actions."
+    }
+  ];
 };
 
 const resolveFileText = async (value: string) => {
@@ -381,21 +650,29 @@ export const buildThinkingPromptFromTal = (tal: Tal) =>
   ].join("\n");
 
 export const buildOutputPromptFromDance = (dance: Dance) =>
-  [
+  (() => {
+    const rules = resolveDanceRules(dance);
+    const examples = resolveDanceExamples(dance);
+    return [
     "Response Style Rules:",
     `Style Profile: ${dance.name}`,
     "Tone:",
-    toBullets(dance.tone),
+    toBullets(rules.tone),
     "Structure:",
-    toBullets(dance.structure),
+    toBullets(rules.structure),
     "Formatting:",
-    toBullets(dance.formatting),
+    toBullets(rules.formatting),
     "Forbidden:",
-    toBullets(dance.forbidden),
-    dance.rhythm ? `Rhythm: ${dance.rhythm}` : ""
+    toBullets(rules.forbidden),
+    rules.rhythm ? `Rhythm: ${rules.rhythm}` : "",
+    examples.length > 0 ? "Style Examples (reference, do not copy verbatim):" : "",
+    ...examples.slice(0, 2).map((example, index) =>
+      [`Example ${index + 1}:`, `Input: ${example.input}`, `Output: ${example.output}`].join("\n")
+    )
   ]
     .filter(Boolean)
     .join("\n");
+  })();
 
 export const buildCustomTal = async (input: BuildCustomTalInput) => {
   const { mergedText, digest } = await mergeSources(input.sources);
@@ -466,32 +743,146 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
   const category = input.category?.trim() || inferCategory(mergedText, "Executive");
   const name = input.name.trim();
   const slug = `${slugify(name)}-custom-dance`;
+  const stage = normalizeStage(input.stage);
+  const inferredStylePolicy = inferStylePolicy(mergedText, input.goal);
+  const stylePolicy = mergeStylePolicy(inferredStylePolicy, input.stylePolicy);
   const tone = inferTone(mergedText);
   const structure = inferStructure(mergedText);
   const formatting = inferFormatting(mergedText);
   const forbidden = inferForbidden(mergedText);
-  const rhythm = inferRhythm(mergedText);
+  let rhythm = inferRhythm(mergedText);
+
+  const isHistoricalReference = stylePolicy.referenceWindow?.mode === "historical" || (stylePolicy.referenceWindow?.cutoffYear ?? 9999) <= 2022;
+  if (isHistoricalReference) {
+    tone.push("grounded", "editorial");
+    formatting.push(
+      "prefer natural prose flow with varied sentence cadence",
+      "use measured transitions instead of formulaic scaffolding"
+    );
+    forbidden.push(
+      "overly synthetic or formulaic transition scaffolding",
+      "uniform sentence shells repeated across paragraphs"
+    );
+    rhythm = "measured editorial cadence";
+  }
+
+  const structureMode = stylePolicy.expression?.structure ?? "hybrid";
+  if (structureMode === "paragraph") {
+    formatting.push("paragraph-first organization; use bullets only for dense facts");
+  } else if (structureMode === "list") {
+    formatting.push("list-first organization with clear section headers");
+  } else {
+    formatting.push("hybrid flow: brief context paragraph then structured bullets");
+  }
+
+  const punctuationDiscipline = stylePolicy.expression?.punctuationDiscipline ?? "balanced";
+  if (punctuationDiscipline === "strict") {
+    formatting.push("punctuation discipline: clean separators and minimal rhetorical punctuation");
+    forbidden.push("separator-heavy punctuation chains (e.g., repeated dashes or stacked parentheticals)");
+  } else if (punctuationDiscipline === "relaxed") {
+    formatting.push("allow expressive punctuation when it improves clarity");
+  }
+
+  const templateStrictness = stylePolicy.expression?.templateStrictness ?? "balanced";
+  if (templateStrictness === "strict") {
+    formatting.push("prioritize authentic phrasing over reusable template shells");
+    forbidden.push("formulaic framing boilerplate and repetitive transition templates");
+    rhythm = structureMode === "paragraph" ? "natural and context-aware" : "precise and low-template";
+  } else if (templateStrictness === "relaxed") {
+    formatting.push("reuse proven templates when speed is more important than originality");
+  }
+
+  if (stylePolicy.referenceWindow?.cutoffYear) {
+    formatting.push(`anchor style references to sources up to ${stylePolicy.referenceWindow.cutoffYear}`);
+  }
+
+  const stageRhythm = applyStageRuleTuning({
+    stage,
+    tone,
+    structure,
+    formatting,
+    forbidden
+  });
+  if (stageRhythm) rhythm = stageRhythm;
+
+  formatting.push(...(stylePolicy.constraints?.prefer ?? []));
+  forbidden.push(...(stylePolicy.constraints?.avoid ?? []));
+
+  const normalizedTone = Array.from(new Set(tone)).slice(0, 6);
+  const normalizedStructure = Array.from(new Set(structure)).slice(0, 6);
+  const normalizedFormatting = Array.from(new Set(formatting)).slice(0, 8);
+  const normalizedForbidden = Array.from(new Set(forbidden)).slice(0, 10);
+
+  const manualExamples = (input.examples ?? [])
+    .map((item) => parseManualExample(item))
+    .filter((item): item is DanceStyleExample => Boolean(item));
+  const inlineExamples = extractInlineExamplesFromText(mergedText);
+  const numberedPostExamples = extractNumberedPostExamplesFromText(mergedText, input.goal);
+  let stageExamples: DanceStyleExample[] = [];
+  const stageExampleLimit = Math.min(Math.max(input.stageContext?.threadsFetchLimit ?? DEFAULT_EXAMPLE_LIMIT, 1), 20);
+
+  if (stage === "threads" && input.stageContext?.threadsAccessToken && input.stageContext?.threadsUserId) {
+    try {
+      const recentTexts = await fetchThreadsRecentTexts({
+        accessToken: input.stageContext.threadsAccessToken,
+        userId: input.stageContext.threadsUserId,
+        baseUrl: input.stageContext.threadsBaseUrl,
+        apiVersion: input.stageContext.threadsApiVersion,
+        limit: input.stageContext.threadsFetchLimit ?? DEFAULT_EXAMPLE_LIMIT
+      });
+
+      stageExamples = recentTexts.slice(0, stageExampleLimit).map((text, index) => ({
+        label: "Threads live sample",
+        input: input.goal?.trim() || `Create a high-retention Threads post (${index + 1}).`,
+        output: text
+      }));
+    } catch {
+      stageExamples = [];
+    }
+  }
+
+  const generatedExamples = buildGeneratedExamples({
+    stage,
+    goal: input.goal,
+    keywords,
+    structure: normalizedStructure
+  });
+
+  const baseExamples = [...manualExamples, ...inlineExamples, ...numberedPostExamples, ...stageExamples];
+  const styleExamples = [...baseExamples];
+  if (styleExamples.length === 0) {
+    styleExamples.push(...generatedExamples);
+  } else if (styleExamples.length < 2) {
+    styleExamples.push(...generatedExamples.slice(0, 2 - styleExamples.length));
+  }
+
+  const exemplarSet = {
+    styleExamples: styleExamples.slice(0, stageExampleLimit),
+    antiPatterns: normalizedForbidden.slice(0, 4).map((item) => ({ bad: item }))
+  };
 
   const dance: Dance = {
     slug,
     name,
     description: input.description?.trim() || `Custom Dance generated from user-provided sources for ${category.toLowerCase()} outputs.`,
     category,
-    tone,
-    structure,
-    formatting,
-    forbidden,
+    rules: {
+      tone: normalizedTone,
+      structure: normalizedStructure,
+      formatting: normalizedFormatting,
+      forbidden: normalizedForbidden,
+      rhythm
+    },
+    exemplarSet,
+    tone: normalizedTone,
+    structure: normalizedStructure,
+    formatting: normalizedFormatting,
+    forbidden: normalizedForbidden,
     rhythm,
-    examples: [
-      {
-        input: input.goal?.trim() || "Need a custom response style for this assistant.",
-        output: `Return outputs using ${name} with concise structure and consistent delivery.`
-      },
-      {
-        input: "Draft this in the configured custom style.",
-        output: "Produce a practical, structured answer that follows the selected tone, formatting, and constraints."
-      }
-    ]
+    examples: exemplarSet.styleExamples.map((item) => ({
+      input: item.input,
+      output: item.output
+    }))
   };
 
   return {
@@ -499,7 +890,16 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
     outputPrompt: buildOutputPromptFromDance(dance),
     sourceDigest: digest,
     extraction: {
-      topKeywords: keywords.slice(0, 8)
+      topKeywords: keywords.slice(0, 8),
+      appliedStylePolicy: stylePolicy,
+      stage,
+      exampleCount: exemplarSet.styleExamples.length,
+      exampleSources: {
+        manual: manualExamples.length,
+        inlineParsed: inlineExamples.length,
+        numberedPosts: numberedPostExamples.length,
+        stageAuto: stageExamples.length
+      }
     }
   };
 };
@@ -511,6 +911,10 @@ export const buildCustomTalDance = async (input: {
   tags?: string[];
   goal?: string;
   sources: CustomSource[];
+  stylePolicy?: DanceStylePolicy;
+  stage?: BuildCustomDanceInput["stage"];
+  examples?: BuildCustomDanceInput["examples"];
+  stageContext?: BuildCustomDanceInput["stageContext"];
 }) => {
   const [talResult, danceResult] = await Promise.all([
     buildCustomTal({
@@ -525,7 +929,11 @@ export const buildCustomTalDance = async (input: {
       category: input.danceCategory,
       tags: input.tags,
       goal: input.goal,
-      sources: input.sources
+      sources: input.sources,
+      stylePolicy: input.stylePolicy,
+      stage: input.stage,
+      examples: input.examples,
+      stageContext: input.stageContext
     })
   ]);
 

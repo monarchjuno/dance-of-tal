@@ -14,17 +14,43 @@ export type Tal = {
   };
 };
 
-export type Dance = {
-  slug: string;
-  name: string;
-  description: string;
-  category: string;
+export type DanceRules = {
   tone: string[];
   structure: string[];
   formatting: string[];
   forbidden: string[];
   rhythm?: string;
-  examples: Array<{
+};
+
+export type DanceStyleExample = {
+  input: string;
+  output: string;
+  label?: string;
+  notes?: string;
+};
+
+export type DanceExemplarSet = {
+  styleExamples: DanceStyleExample[];
+  antiPatterns?: Array<{
+    bad: string;
+    better?: string;
+    reason?: string;
+  }>;
+};
+
+export type Dance = {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  rules?: DanceRules;
+  exemplarSet?: DanceExemplarSet;
+  tone?: string[];
+  structure?: string[];
+  formatting?: string[];
+  forbidden?: string[];
+  rhythm?: string;
+  examples?: Array<{
     input: string;
     output: string;
   }>;

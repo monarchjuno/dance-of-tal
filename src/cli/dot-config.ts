@@ -83,40 +83,6 @@ const resolveDefaultComboName = ({ name, talSlug, danceSlug }: { name?: string; 
   return `combo-${new Date().toISOString().slice(0, 10)}`;
 };
 
-const migrateLegacyConfig = (raw: unknown): DotConfig | null => {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-
-  const talSlug = typeof (obj.activePair as Record<string, unknown> | undefined)?.talSlug === "string"
-    ? ((obj.activePair as Record<string, unknown>).talSlug as string)
-    : null;
-  const danceSlug = typeof (obj.activePair as Record<string, unknown> | undefined)?.danceSlug === "string"
-    ? ((obj.activePair as Record<string, unknown>).danceSlug as string)
-    : null;
-
-  const base = buildDefaultConfig();
-  if (!talSlug && !danceSlug) return base;
-
-  const comboId = randomUUID();
-  const createdAt = nowISO();
-  return {
-    ...base,
-    updatedAt: createdAt,
-    activeComboId: comboId,
-    combos: [
-      {
-        id: comboId,
-        name: resolveDefaultComboName({ name: "Migrated Combo", talSlug, danceSlug }),
-        talRef: talSlug ? { kind: "preset", slug: talSlug } : null,
-        danceRef: danceSlug ? { kind: "preset", slug: danceSlug } : null,
-        createdAt,
-        updatedAt: createdAt
-      }
-    ],
-    history: [{ comboId, setAt: createdAt }]
-  };
-};
-
 export const resolveProjectDir = (projectDir?: string) => {
   const input = projectDir?.trim();
   return path.resolve(input && input.length > 0 ? input : process.cwd());
@@ -168,11 +134,6 @@ export const readProjectConfig = async (projectDir?: string): Promise<DotConfig 
     const strict = dotConfigSchema.safeParse(parsed);
     if (strict.success) {
       return strict.data;
-    }
-
-    const migrated = migrateLegacyConfig(parsed);
-    if (migrated) {
-      return migrated;
     }
 
     throw strict.error;

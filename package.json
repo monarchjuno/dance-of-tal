@@ -28,17 +28,13 @@
   "type": "module",
   "bin": {
     "dance-of-tal": "dist/server/index.js",
-    "dot": "dist/cli/dot.js",
-    "tal": "dist/cli/tal.js",
-    "dance": "dist/cli/dance.js"
+    "dot": "dist/cli/dot.js"
   },
   "scripts": {
     "dev": "tsx src/server/index.ts",
-    "build": "tsup src/server/index.ts src/cli/tal.ts src/cli/dance.ts src/cli/dot.ts --format esm --out-dir dist --clean",
+    "build": "tsup src/server/index.ts src/cli/dot.ts --format esm --out-dir dist --clean",
     "prepublishOnly": "npm run build",
     "start": "node dist/server/index.js",
-    "cli": "tsx src/cli/tal.ts",
-    "cli:dance": "tsx src/cli/dance.ts",
     "cli:dot": "tsx src/cli/dot.ts"
   },
   "dependencies": {

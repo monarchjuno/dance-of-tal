@@ -3,6 +3,7 @@ import { tals } from "../data/tals.js";
 import { Dance, Tal } from "../data/types.js";
 import { dataSummary, recommendedCombos } from "../data/catalog.js";
 import { getDanceCategories, getDanceCategory, recommendDanceCategoriesForTal } from "./danceCategory.js";
+import { collectDanceRuleTokens, resolveDanceExamples, resolveDanceExemplarSet, resolveDanceRules } from "./dance-schema.js";
 
 export type ListInput = {
   query?: string;
@@ -30,7 +31,15 @@ const buildSystemInstructionHeader = () =>
   ].join("\n");
 
 export const findTal = (slug: string): Tal | undefined => tals.find((tal) => tal.slug === slug);
-export const findDance = (slug: string): Dance | undefined => dances.find((dance) => dance.slug === slug);
+const normalizeDance = (dance: Dance): Dance => ({
+  ...dance,
+  rules: resolveDanceRules(dance),
+  exemplarSet: resolveDanceExemplarSet(dance)
+});
+export const findDance = (slug: string): Dance | undefined => {
+  const dance = dances.find((item) => item.slug === slug);
+  return dance ? normalizeDance(dance) : undefined;
+};
 
 export const listTals = ({ query, category, tags }: ListInput) => {
   const normalizedQuery = query?.toLowerCase().trim() ?? "";
@@ -54,10 +63,12 @@ export const listDances = ({ query, category, tags }: ListInput) => {
   return dances
     .filter((dance) => {
       const danceCategory = getDanceCategory(dance);
+      const rules = resolveDanceRules(dance);
+      const ruleTokens = collectDanceRuleTokens(dance);
       const matchQuery =
         normalizedQuery.length === 0 ||
-        [dance.name, dance.description, danceCategory, ...dance.tone, ...dance.structure, ...dance.formatting].join(" ").toLowerCase().includes(normalizedQuery);
-      const tagSource = [...dance.tone, ...dance.structure, ...dance.formatting].map((item) => item.toLowerCase());
+        [dance.name, dance.description, danceCategory, ...ruleTokens].join(" ").toLowerCase().includes(normalizedQuery);
+      const tagSource = [...rules.tone, ...rules.structure, ...rules.formatting].map((item) => item.toLowerCase());
       const matchTags = normalizedTags.length === 0 || normalizedTags.every((tag) => tagSource.includes(tag));
       const matchCategory = !category || danceCategory === category;
       return matchQuery && matchTags && matchCategory;
@@ -67,8 +78,8 @@ export const listDances = ({ query, category, tags }: ListInput) => {
       name: dance.name,
       description: dance.description,
       category: getDanceCategory(dance),
-      tone: dance.tone,
-      structure: dance.structure
+      tone: resolveDanceRules(dance).tone,
+      structure: resolveDanceRules(dance).structure
     }));
 };
 
@@ -155,18 +166,24 @@ export const buildThinkingPrompt = (tal: Tal) => {
 };
 
 export const buildOutputPrompt = (dance: Dance) => {
+  const rules = resolveDanceRules(dance);
+  const examples = resolveDanceExamples(dance);
   return [
     "Response Style Rules:",
     `Style Profile: ${dance.name}`,
     "Tone:",
-    toBullets(dance.tone),
+    toBullets(rules.tone),
     "Structure:",
-    toBullets(dance.structure),
+    toBullets(rules.structure),
     "Formatting:",
-    toBullets(dance.formatting),
+    toBullets(rules.formatting),
     "Forbidden:",
-    toBullets(dance.forbidden),
-    dance.rhythm ? `Rhythm: ${dance.rhythm}` : ""
+    toBullets(rules.forbidden),
+    rules.rhythm ? `Rhythm: ${rules.rhythm}` : "",
+    examples.length > 0 ? "Style Examples (reference, do not copy verbatim):" : "",
+    ...examples.slice(0, 2).map((example, index) =>
+      [`Example ${index + 1}:`, `Input: ${example.input}`, `Output: ${example.output}`].join("\n")
+    )
   ]
     .filter(Boolean)
     .join("\n");
