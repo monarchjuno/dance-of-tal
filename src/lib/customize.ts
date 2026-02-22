@@ -1,7 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { Dance, DanceStyleExample, Tal } from "../data/types.js";
-import { resolveDanceExamples, resolveDanceRules } from "./dance-schema.js";
+import { resolveDanceExamples, resolveDanceRuleText } from "./dance-schema.js";
+import { resolveTalThinkingText } from "./tal-schema.js";
 import { fetchThreadsRecentTexts } from "./stages/threads.js";
 
 export type SourceKind = "text" | "file" | "url";
@@ -163,8 +164,6 @@ const EXT_ALLOWLIST = new Set([
   ".htm",
   ".log"
 ]);
-
-const toBullets = (items: string[]) => items.map((item) => `- ${item}`).join("\n");
 
 const cleanText = (text: string) =>
   text
@@ -636,42 +635,23 @@ const mergeSources = async (sources: CustomSource[]) => {
 };
 
 export const buildThinkingPromptFromTal = (tal: Tal) =>
-  [
-    "Reasoning Rules:",
-    `Profile: ${tal.name}`,
-    "Core principles:",
-    toBullets(tal.thinking.principles),
-    "Do:",
-    toBullets(tal.thinking.do),
-    "Do not:",
-    toBullets(tal.thinking.dont),
-    "Checklist:",
-    toBullets(tal.thinking.checklist)
-  ].join("\n");
+  ["Reasoning Rules:", `Profile: ${tal.name}`, resolveTalThinkingText(tal)].join("\n");
 
 export const buildOutputPromptFromDance = (dance: Dance) =>
   (() => {
-    const rules = resolveDanceRules(dance);
     const examples = resolveDanceExamples(dance);
+    const ruleText = resolveDanceRuleText(dance);
     return [
-    "Response Style Rules:",
-    `Style Profile: ${dance.name}`,
-    "Tone:",
-    toBullets(rules.tone),
-    "Structure:",
-    toBullets(rules.structure),
-    "Formatting:",
-    toBullets(rules.formatting),
-    "Forbidden:",
-    toBullets(rules.forbidden),
-    rules.rhythm ? `Rhythm: ${rules.rhythm}` : "",
-    examples.length > 0 ? "Style Examples (reference, do not copy verbatim):" : "",
-    ...examples.slice(0, 2).map((example, index) =>
-      [`Example ${index + 1}:`, `Input: ${example.input}`, `Output: ${example.output}`].join("\n")
-    )
-  ]
-    .filter(Boolean)
-    .join("\n");
+      "Response Style Rules:",
+      `Style Profile: ${dance.name}`,
+      ruleText,
+      examples.length > 0 ? "Style Examples (reference, do not copy verbatim):" : "",
+      ...examples.slice(0, 2).map((example, index) =>
+        [`Example ${index + 1}:`, `Input: ${example.input}`, `Output: ${example.output}`].join("\n")
+      )
+    ]
+      .filter(Boolean)
+      .join("\n");
   })();
 
 export const buildCustomTal = async (input: BuildCustomTalInput) => {
@@ -682,29 +662,16 @@ export const buildCustomTal = async (input: BuildCustomTalInput) => {
   const name = input.name.trim();
   const slug = `${slugify(name)}-custom-tal`;
   const goal = input.goal?.trim();
-
-  const principles = [
-    goal ? `Optimize decisions for: ${goal}` : "Start from explicit objective and constraints.",
-    keywords[0] ? `Treat "${keywords[0]}" as a first-class signal in decision making.` : "Prioritize highest-leverage drivers first.",
-    keywords[1] ? `Use "${keywords[1]}" as a validation axis before finalizing output.` : "Separate assumptions from verified evidence."
-  ];
-
-  const doList = [
-    "State assumptions and tradeoffs in plain language.",
-    "Convert analysis into concrete next actions with owners.",
-    keywords[2] ? `Reference source evidence around "${keywords[2]}".` : "Anchor conclusions to source evidence."
-  ];
-
-  const dontList = [
-    "Do not produce vague recommendations without execution detail.",
-    "Do not hide uncertainty or missing evidence."
-  ];
-
-  const checklist = [
-    "Is the objective explicit and measurable?",
-    "Are key assumptions and risks visible?",
-    "Is there a concrete next step with ownership?"
-  ];
+  const thinkingFreeform = [
+    goal ? `Primary objective: ${goal}` : "Primary objective: make decisions from explicit constraints and measurable outcomes.",
+    keywords[0] ? `Anchor decisions around "${keywords[0]}" as a first-class signal.` : "Anchor decisions around highest-leverage signals first.",
+    keywords[1] ? `Use "${keywords[1]}" as a validation checkpoint before finalizing recommendations.` : "Separate assumptions from verified evidence before finalizing recommendations.",
+    "Keep tradeoffs visible and state uncertainty directly.",
+    "Translate analysis into concrete next actions with owner and timeline.",
+    "Avoid vague language, decorative logic chains, and unsupported conclusions."
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const tags = Array.from(
     new Set([...(input.tags ?? []).map(normalizeTag).filter(Boolean), ...keywords.slice(0, 4).map(normalizeTag), "custom", "user-derived"])
@@ -718,12 +685,7 @@ export const buildCustomTal = async (input: BuildCustomTalInput) => {
     tags,
     featuredScore: 110,
     createdAt: todayISO(),
-    thinking: {
-      principles,
-      do: doList,
-      dont: dontList,
-      checklist
-    }
+    thinking: thinkingFreeform
   };
 
   return {
@@ -812,6 +774,22 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
   const normalizedStructure = Array.from(new Set(structure)).slice(0, 6);
   const normalizedFormatting = Array.from(new Set(formatting)).slice(0, 8);
   const normalizedForbidden = Array.from(new Set(forbidden)).slice(0, 10);
+  const ruleFreeform = [
+    input.goal?.trim()
+      ? `Output objective: ${input.goal.trim()}`
+      : "Output objective: deliver actionable and context-grounded responses.",
+    normalizedTone.length > 0 ? `Voice and tone guidance: ${normalizedTone.join(", ")}.` : "",
+    normalizedStructure.length > 0 ? `Response flow guidance: ${normalizedStructure.join(" -> ")}.` : "",
+    normalizedFormatting.length > 0 ? `Formatting preferences: ${normalizedFormatting.join("; ")}.` : "",
+    normalizedForbidden.length > 0 ? `Avoid patterns: ${normalizedForbidden.join("; ")}.` : "",
+    rhythm ? `Cadence: ${rhythm}.` : "",
+    stylePolicy.referenceWindow?.mode === "historical"
+      ? "Reference preference: use historical examples and human-written cadence; avoid recent AI-template phrasing."
+      : "",
+    stylePolicy.referenceWindow?.cutoffYear ? `Reference cutoff: prioritize material published on or before ${stylePolicy.referenceWindow.cutoffYear}.` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const manualExamples = (input.examples ?? [])
     .map((item) => parseManualExample(item))
@@ -866,23 +844,8 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
     name,
     description: input.description?.trim() || `Custom Dance generated from user-provided sources for ${category.toLowerCase()} outputs.`,
     category,
-    rules: {
-      tone: normalizedTone,
-      structure: normalizedStructure,
-      formatting: normalizedFormatting,
-      forbidden: normalizedForbidden,
-      rhythm
-    },
-    exemplarSet,
-    tone: normalizedTone,
-    structure: normalizedStructure,
-    formatting: normalizedFormatting,
-    forbidden: normalizedForbidden,
-    rhythm,
-    examples: exemplarSet.styleExamples.map((item) => ({
-      input: item.input,
-      output: item.output
-    }))
+    rules: ruleFreeform,
+    exemplarSet
   };
 
   return {

@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { Dance, Tal } from "../data/types.js";
 import { buildCustomDance, buildCustomTal, resolveUnifiedSources } from "../lib/customize.js";
-import { resolveDanceRules } from "../lib/dance-schema.js";
+import { summarizeDanceRule } from "../lib/dance-schema.js";
 import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal, listDances, listTals } from "../lib/persona.js";
 import {
   publishThreadsText,
@@ -867,7 +867,7 @@ async function runList(args: string[]) {
     const config = await readProjectConfig(projectDir);
     const custom = (config?.customDances ?? [])
       .map((item) => {
-        const rules = resolveDanceRules(item.dance);
+        const rules = summarizeDanceRule(item.dance);
         return {
           slug: item.dance.slug,
           name: item.dance.name,

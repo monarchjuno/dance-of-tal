@@ -6,20 +6,7 @@ export type Tal = {
   tags: string[];
   featuredScore: number;
   createdAt: string;
-  thinking: {
-    principles: string[];
-    do: string[];
-    dont: string[];
-    checklist: string[];
-  };
-};
-
-export type DanceRules = {
-  tone: string[];
-  structure: string[];
-  formatting: string[];
-  forbidden: string[];
-  rhythm?: string;
+  thinking: string;
 };
 
 export type DanceStyleExample = {
@@ -43,17 +30,8 @@ export type Dance = {
   name: string;
   description: string;
   category: string;
-  rules?: DanceRules;
+  rules: string;
   exemplarSet?: DanceExemplarSet;
-  tone?: string[];
-  structure?: string[];
-  formatting?: string[];
-  forbidden?: string[];
-  rhythm?: string;
-  examples?: Array<{
-    input: string;
-    output: string;
-  }>;
 };
 
 export type TalDanceRelation = {

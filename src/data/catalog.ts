@@ -1,3 +1,6 @@
+import dancesJson from "./dances.json";
+import recommendedCombosJson from "./recommended-combos.json";
+import talsJson from "./tals.json";
 import {
   ComboSummary,
   Dance,
@@ -11,8 +14,7 @@ import {
   Tal,
   TalSummary
 } from "./types.js";
-import { hardcodedDances, hardcodedRecommendedCombos, hardcodedTals } from "./hardcoded-catalog.js";
-import { resolveDanceRules } from "../lib/dance-schema.js";
+import { summarizeDanceRule } from "../lib/dance-schema.js";
 
 type NeedHintRule = {
   id: string;
@@ -65,12 +67,6 @@ const NEED_HINT_RULES: NeedHintRule[] = [
     danceCategories: ["Education"]
   },
   {
-    id: "legal",
-    keywords: ["legal", "compliance", "policy", "terms", "법무", "컴플라이언스", "정책", "약관"],
-    talCategories: ["Operations", "Strategy"],
-    danceCategories: ["Operations", "Executive"]
-  },
-  {
     id: "creator",
     keywords: ["creator", "content", "script", "campaign", "brand", "크리에이터", "콘텐츠", "스크립트", "브랜딩"],
     talCategories: ["Creator", "Brand"],
@@ -98,9 +94,9 @@ const NEED_HINT_RULES: NeedHintRule[] = [
 
 const uniq = <T>(items: T[]) => Array.from(new Set(items));
 
-export const tals: Tal[] = hardcodedTals;
-export const dances: Dance[] = hardcodedDances;
-export const recommendedCombos: RecommendedCombos = hardcodedRecommendedCombos;
+export const tals: Tal[] = talsJson as Tal[];
+export const dances: Dance[] = dancesJson as Dance[];
+export const recommendedCombos: RecommendedCombos = recommendedCombosJson as RecommendedCombos;
 
 const talToDance = recommendedCombos.talToDance ?? {};
 const talBySlug = new Map(tals.map((tal) => [tal.slug, tal]));
@@ -124,15 +120,15 @@ const talSummaries: TalSummary[] = tals.map((tal) => {
 });
 
 const danceSummaries: DanceSummary[] = dances.map((dance) => {
-  const rules = resolveDanceRules(dance);
+  const summary = summarizeDanceRule(dance);
   return {
     slug: dance.slug,
     name: dance.name,
     category: dance.category,
     description: dance.description,
-    tone: rules.tone,
-    structure: rules.structure,
-    rhythm: rules.rhythm ?? null
+    tone: summary.tone,
+    structure: summary.structure,
+    rhythm: summary.rhythm
   };
 });
 
@@ -176,14 +172,17 @@ export const gptsTalBriefs: GptsTalBrief[] = tals
     f: tal.featuredScore
   }));
 
-export const gptsDanceBriefs: GptsDanceBrief[] = dances.map((dance) => ({
-  s: dance.slug,
-  n: dance.name,
-  c: dance.category,
-  t: resolveDanceRules(dance).tone.slice(0, 2),
-  st: resolveDanceRules(dance).structure.slice(0, 2),
-  d: dance.description
-}));
+export const gptsDanceBriefs: GptsDanceBrief[] = dances.map((dance) => {
+  const summary = summarizeDanceRule(dance);
+  return {
+    s: dance.slug,
+    n: dance.name,
+    c: dance.category,
+    t: summary.tone.slice(0, 2),
+    st: summary.structure.slice(0, 2),
+    d: dance.description
+  };
+});
 
 export const gptsReco: GptsRecoMap = Object.fromEntries(
   Object.entries(talToDance).map(([slug, relation]) => [

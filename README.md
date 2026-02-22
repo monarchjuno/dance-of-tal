@@ -309,8 +309,10 @@ Then copy returned `profile.systemPrompt` into your OpenClaw assistant profile.
 
 ## Data model and storage
 
-- Catalog is hardcoded in code for open-source portability:
-  - `src/data/hardcoded-catalog.ts`
+- Catalog is stored as JSON in repo:
+  - `src/data/tals.json`
+  - `src/data/dances.json`
+  - `src/data/recommended-combos.json`
   - derived indexes in `src/data/catalog.ts`
 - Project-local runtime state:
   - `.dance-of-tal/config.json`

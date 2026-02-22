@@ -1,6 +1,12 @@
-import { Dance, DanceExemplarSet, DanceRules, DanceStyleExample } from "../data/types.js";
+import { Dance, DanceExemplarSet, DanceStyleExample } from "../data/types.js";
 
-const normalizeList = (items?: string[]) => (Array.isArray(items) ? items.map((item) => item.trim()).filter(Boolean) : []);
+const extractRuleTokens = (text: string) =>
+  text
+    .split(/\n+/g)
+    .map((line) => line.replace(/^[-*]\s+/, "").trim())
+    .filter(Boolean)
+    .flatMap((line) => line.split(/[,:;|/]+/g).map((part) => part.trim()).filter(Boolean))
+    .slice(0, 40);
 
 const normalizeExample = (value: { input?: string; output?: string; label?: string; notes?: string }): DanceStyleExample | null => {
   const input = value.input?.trim() ?? "";
@@ -14,28 +20,13 @@ const normalizeExample = (value: { input?: string; output?: string; label?: stri
   };
 };
 
-export const resolveDanceRules = (dance: Dance): DanceRules => {
-  const rules = dance.rules;
-  return {
-    tone: normalizeList(rules?.tone ?? dance.tone),
-    structure: normalizeList(rules?.structure ?? dance.structure),
-    formatting: normalizeList(rules?.formatting ?? dance.formatting),
-    forbidden: normalizeList(rules?.forbidden ?? dance.forbidden),
-    rhythm: rules?.rhythm?.trim() || dance.rhythm?.trim() || undefined
-  };
-};
-
 export const resolveDanceExemplarSet = (dance: Dance): DanceExemplarSet => {
   const styleExamples = (dance.exemplarSet?.styleExamples ?? [])
     .map((example) => normalizeExample(example))
     .filter((example): example is DanceStyleExample => Boolean(example));
 
-  const fromLegacy = (dance.examples ?? [])
-    .map((example) => normalizeExample(example))
-    .filter((example): example is DanceStyleExample => Boolean(example));
-
   return {
-    styleExamples: (styleExamples.length > 0 ? styleExamples : fromLegacy).slice(0, 4),
+    styleExamples: styleExamples.slice(0, 4),
     antiPatterns: dance.exemplarSet?.antiPatterns?.slice(0, 4)
   };
 };
@@ -43,6 +34,32 @@ export const resolveDanceExemplarSet = (dance: Dance): DanceExemplarSet => {
 export const resolveDanceExamples = (dance: Dance) => resolveDanceExemplarSet(dance).styleExamples;
 
 export const collectDanceRuleTokens = (dance: Dance) => {
-  const rules = resolveDanceRules(dance);
-  return [...rules.tone, ...rules.structure, ...rules.formatting, ...rules.forbidden];
+  return extractRuleTokens(dance.rules ?? "");
+};
+
+const findSection = (text: string, label: "tone" | "structure") => {
+  const lines = text.split(/\n+/g);
+  const idx = lines.findIndex((line) => line.toLowerCase().startsWith(`${label}:`));
+  if (idx === -1) return [];
+  const collected: string[] = [];
+  for (let i = idx + 1; i < lines.length; i += 1) {
+    const raw = lines[i].trim();
+    if (!raw) continue;
+    if (/^[a-z][a-z\s]+:/i.test(raw)) break;
+    collected.push(raw.replace(/^[-*]\s+/, ""));
+  }
+  return collected.slice(0, 6);
+};
+
+export const resolveDanceRuleText = (dance: Dance) => dance.rules.trim();
+
+export const summarizeDanceRule = (dance: Dance) => {
+  const text = resolveDanceRuleText(dance);
+  const tone = findSection(text, "tone");
+  const structure = findSection(text, "structure");
+  return {
+    tone: tone.length > 0 ? tone : extractRuleTokens(text).slice(0, 3),
+    structure: structure.length > 0 ? structure : extractRuleTokens(text).slice(3, 6),
+    rhythm: null as string | null
+  };
 };

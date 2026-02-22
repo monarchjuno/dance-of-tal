@@ -3,7 +3,8 @@ import { tals } from "../data/tals.js";
 import { Dance, Tal } from "../data/types.js";
 import { dataSummary, recommendedCombos } from "../data/catalog.js";
 import { getDanceCategories, getDanceCategory, recommendDanceCategoriesForTal } from "./danceCategory.js";
-import { collectDanceRuleTokens, resolveDanceExamples, resolveDanceExemplarSet, resolveDanceRules } from "./dance-schema.js";
+import { collectDanceRuleTokens, resolveDanceExamples, resolveDanceExemplarSet, resolveDanceRuleText, summarizeDanceRule } from "./dance-schema.js";
+import { collectTalThinkingTokens, resolveTalThinkingText } from "./tal-schema.js";
 
 export type ListInput = {
   query?: string;
@@ -21,7 +22,6 @@ export type OpenClawProfileInput = {
   includeTaskStarter?: boolean;
 };
 
-const toBullets = (items: string[]) => items.map((item) => `- ${item}`).join("\n");
 const buildSystemInstructionHeader = () =>
   [
     "System Instruction:",
@@ -33,7 +33,6 @@ const buildSystemInstructionHeader = () =>
 export const findTal = (slug: string): Tal | undefined => tals.find((tal) => tal.slug === slug);
 const normalizeDance = (dance: Dance): Dance => ({
   ...dance,
-  rules: resolveDanceRules(dance),
   exemplarSet: resolveDanceExemplarSet(dance)
 });
 export const findDance = (slug: string): Dance | undefined => {
@@ -48,7 +47,8 @@ export const listTals = ({ query, category, tags }: ListInput) => {
   return tals
     .filter((tal) => {
       const matchQuery =
-        normalizedQuery.length === 0 || [tal.name, tal.description, tal.category, ...tal.tags].join(" ").toLowerCase().includes(normalizedQuery);
+        normalizedQuery.length === 0 ||
+        [tal.name, tal.description, tal.category, ...tal.tags, ...collectTalThinkingTokens(tal)].join(" ").toLowerCase().includes(normalizedQuery);
       const matchCategory = !category || tal.category === category;
       const matchTags = normalizedTags.length === 0 || normalizedTags.every((tag) => tal.tags.map((t) => t.toLowerCase()).includes(tag));
       return matchQuery && matchCategory && matchTags;
@@ -63,12 +63,12 @@ export const listDances = ({ query, category, tags }: ListInput) => {
   return dances
     .filter((dance) => {
       const danceCategory = getDanceCategory(dance);
-      const rules = resolveDanceRules(dance);
       const ruleTokens = collectDanceRuleTokens(dance);
       const matchQuery =
         normalizedQuery.length === 0 ||
         [dance.name, dance.description, danceCategory, ...ruleTokens].join(" ").toLowerCase().includes(normalizedQuery);
-      const tagSource = [...rules.tone, ...rules.structure, ...rules.formatting].map((item) => item.toLowerCase());
+      const summary = summarizeDanceRule(dance);
+      const tagSource = [...summary.tone, ...summary.structure, ...ruleTokens].map((item) => item.toLowerCase());
       const matchTags = normalizedTags.length === 0 || normalizedTags.every((tag) => tagSource.includes(tag));
       const matchCategory = !category || danceCategory === category;
       return matchQuery && matchTags && matchCategory;
@@ -78,8 +78,8 @@ export const listDances = ({ query, category, tags }: ListInput) => {
       name: dance.name,
       description: dance.description,
       category: getDanceCategory(dance),
-      tone: resolveDanceRules(dance).tone,
-      structure: resolveDanceRules(dance).structure
+      tone: summarizeDanceRule(dance).tone,
+      structure: summarizeDanceRule(dance).structure
     }));
 };
 
@@ -154,32 +154,18 @@ export const buildThinkingPrompt = (tal: Tal) => {
   return [
     "Reasoning Rules:",
     `Profile: ${tal.name}`,
-    "Core principles:",
-    toBullets(tal.thinking.principles),
-    "Do:",
-    toBullets(tal.thinking.do),
-    "Do not:",
-    toBullets(tal.thinking.dont),
-    "Checklist:",
-    toBullets(tal.thinking.checklist)
+    resolveTalThinkingText(tal)
   ].join("\n");
 };
 
 export const buildOutputPrompt = (dance: Dance) => {
-  const rules = resolveDanceRules(dance);
+  const ruleText = resolveDanceRuleText(dance);
   const examples = resolveDanceExamples(dance);
+
   return [
     "Response Style Rules:",
     `Style Profile: ${dance.name}`,
-    "Tone:",
-    toBullets(rules.tone),
-    "Structure:",
-    toBullets(rules.structure),
-    "Formatting:",
-    toBullets(rules.formatting),
-    "Forbidden:",
-    toBullets(rules.forbidden),
-    rules.rhythm ? `Rhythm: ${rules.rhythm}` : "",
+    ruleText,
     examples.length > 0 ? "Style Examples (reference, do not copy verbatim):" : "",
     ...examples.slice(0, 2).map((example, index) =>
       [`Example ${index + 1}:`, `Input: ${example.input}`, `Output: ${example.output}`].join("\n")
