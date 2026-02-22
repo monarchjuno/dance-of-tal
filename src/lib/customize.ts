@@ -797,25 +797,32 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
   const inlineExamples = extractInlineExamplesFromText(mergedText);
   const numberedPostExamples = extractNumberedPostExamplesFromText(mergedText, input.goal);
   let stageExamples: DanceStyleExample[] = [];
+  const stageWarnings: string[] = [];
   const stageExampleLimit = Math.min(Math.max(input.stageContext?.threadsFetchLimit ?? DEFAULT_EXAMPLE_LIMIT, 1), 20);
 
-  if (stage === "threads" && input.stageContext?.threadsAccessToken && input.stageContext?.threadsUserId) {
-    try {
-      const recentTexts = await fetchThreadsRecentTexts({
-        accessToken: input.stageContext.threadsAccessToken,
-        userId: input.stageContext.threadsUserId,
-        baseUrl: input.stageContext.threadsBaseUrl,
-        apiVersion: input.stageContext.threadsApiVersion,
-        limit: input.stageContext.threadsFetchLimit ?? DEFAULT_EXAMPLE_LIMIT
-      });
+  if (stage === "threads") {
+    if (input.stageContext?.threadsAccessToken && input.stageContext?.threadsUserId) {
+      try {
+        const recentTexts = await fetchThreadsRecentTexts({
+          accessToken: input.stageContext.threadsAccessToken,
+          userId: input.stageContext.threadsUserId,
+          baseUrl: input.stageContext.threadsBaseUrl,
+          apiVersion: input.stageContext.threadsApiVersion,
+          limit: input.stageContext.threadsFetchLimit ?? DEFAULT_EXAMPLE_LIMIT
+        });
 
-      stageExamples = recentTexts.slice(0, stageExampleLimit).map((text, index) => ({
-        label: "Threads live sample",
-        input: input.goal?.trim() || `Create a high-retention Threads post (${index + 1}).`,
-        output: text
-      }));
-    } catch {
-      stageExamples = [];
+        stageExamples = recentTexts.slice(0, stageExampleLimit).map((text, index) => ({
+          label: "Threads live sample",
+          input: input.goal?.trim() || `Create a high-retention Threads post (${index + 1}).`,
+          output: text
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        stageWarnings.push(`Threads stage auto-sample fetch failed: ${message}`);
+        stageExamples = [];
+      }
+    } else {
+      stageWarnings.push("Threads stage selected without access token/user id; using provided or generated examples only.");
     }
   }
 
@@ -852,11 +859,13 @@ export const buildCustomDance = async (input: BuildCustomDanceInput) => {
     dance,
     outputPrompt: buildOutputPromptFromDance(dance),
     sourceDigest: digest,
+    warnings: stageWarnings,
     extraction: {
       topKeywords: keywords.slice(0, 8),
       appliedStylePolicy: stylePolicy,
       stage,
       exampleCount: exemplarSet.styleExamples.length,
+      stageWarnings,
       exampleSources: {
         manual: manualExamples.length,
         inlineParsed: inlineExamples.length,

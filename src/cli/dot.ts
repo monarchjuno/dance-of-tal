@@ -2043,8 +2043,14 @@ async function runDoctor(args: string[]) {
 
 async function main() {
   const [, , command, ...args] = process.argv;
+  const commandHelpRequested = args.includes("--help") || args.includes("-h");
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
+    printUsage();
+    return;
+  }
+
+  if (commandHelpRequested) {
     printUsage();
     return;
   }
