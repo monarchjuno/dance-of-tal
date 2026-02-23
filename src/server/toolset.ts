@@ -22,6 +22,9 @@ export const ALL_TOOLS = [
   "build_custom_tal",
   "build_custom_dance",
   "build_custom_tal_dance",
+  "update_custom_tal",
+  "update_custom_dance",
+  "update_combo",
   "abstract_tal_dance",
   "get_gpts_bootstrap",
   "list_gpts_tals",
@@ -37,26 +40,24 @@ export const CORE_TOOLS = [
   "set_active_combo",
   "get_session",
   "run_active_combo",
-  "clear_session",
+  "clear_session"
+] as const;
+
+export const STANDARD_TOOLS = [
+  ...CORE_TOOLS,
+  "list_sessions",
   "list_tals",
   "get_tal",
   "list_dances",
   "get_dance",
   "build_prompt",
   "quick_apply",
-  "recommend_gpts"
-] as const;
-
-export const STANDARD_TOOLS = [
-  ...CORE_TOOLS,
-  "list_sessions",
-  "list_dance_categories",
-  "recommend_dance_categories",
-  "get_recommended_combos",
-  "build_openclaw_profile",
   "build_custom_tal",
   "build_custom_dance",
   "build_custom_tal_dance",
+  "update_custom_tal",
+  "update_custom_dance",
+  "update_combo",
   "abstract_tal_dance"
 ] as const;
 
@@ -66,11 +67,12 @@ const normalizeToolName = (value: string) => value.toLowerCase().trim().replace(
 const ALL_TOOL_SET = new Set<string>(ALL_TOOLS);
 
 export const resolveToolSet = () => {
-  const raw = (process.env.DANCE_OF_TAL_TOOLS ?? "standard").trim();
+  const raw = (process.env.DANCE_OF_TAL_TOOLS ?? "core").trim();
   const mode = raw.toLowerCase();
 
   if (mode === "all") return new Set<string>(ALL_TOOLS);
-  if (mode === "standard" || mode === "default") return new Set<string>(STANDARD_TOOLS);
+  if (mode === "standard") return new Set<string>(STANDARD_TOOLS);
+  if (mode === "default") return new Set<string>(CORE_TOOLS);
   if (mode === "core" || mode === "lean") return new Set<string>(CORE_TOOLS);
 
   const requested = raw
@@ -79,7 +81,7 @@ export const resolveToolSet = () => {
     .filter(Boolean);
 
   if (requested.length === 0) {
-    return new Set<string>(STANDARD_TOOLS);
+    return new Set<string>(CORE_TOOLS);
   }
 
   const unknown = requested.filter((tool) => !ALL_TOOL_SET.has(tool));
@@ -89,7 +91,7 @@ export const resolveToolSet = () => {
 
   const resolved = requested.filter((tool) => ALL_TOOL_SET.has(tool));
   if (resolved.length === 0) {
-    return new Set<string>(STANDARD_TOOLS);
+    return new Set<string>(CORE_TOOLS);
   }
 
   return new Set<string>(resolved);

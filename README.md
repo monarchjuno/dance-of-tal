@@ -102,12 +102,20 @@ Use this for most MCP hosts:
       "command": "npx",
       "args": ["-y", "dance-of-tal"],
       "env": {
-        "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
+        "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT",
+        "DANCE_OF_TAL_TOOLS": "core"
       }
     }
   }
 }
 ```
+
+Tool profile guidance:
+
+- `core` (default): workflow-first minimal toolset to reduce MCP context load
+- `standard`: adds list/get and custom build/update tools
+- `all`: exposes every tool, including GPTs/data helper tools
+- custom CSV: `DANCE_OF_TAL_TOOLS="initialize_styling_session,next_combo,set_active_combo,run_active_combo"`
 
 ## Highlights
 
@@ -198,6 +206,9 @@ Available tools:
 - `build_custom_tal`
 - `build_custom_dance`
 - `build_custom_tal_dance`
+- `update_custom_tal`
+- `update_custom_dance`
+- `update_combo`
 - `abstract_tal_dance`
 
 Example: apply a general style policy (reference scope + expression rules + avoid/prefer constraints).
@@ -254,6 +265,8 @@ Stage-aware example generation:
 
 ## MCP tools
 
+Note: default MCP startup loads the `core` profile only. Lists below show the full catalog.
+
 Core workflow tools:
 
 - `workflow_overview`
@@ -286,6 +299,9 @@ Extended tools:
 - `list_gpts_tals`
 - `list_gpts_dances`
 - `build_openclaw_profile`
+- `update_custom_tal`
+- `update_custom_dance`
+- `update_combo`
 - `abstract_tal_dance`
 
 ## OpenClaw integration

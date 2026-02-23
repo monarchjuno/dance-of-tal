@@ -11,7 +11,7 @@ import { resolveToolSet } from "./toolset.js";
 
 const server = new McpServer({
   name: "dance-of-tal",
-  version: "0.5.3",
+  version: "0.5.7",
   description: "Tal x Dance MCP server"
 });
 
@@ -33,7 +33,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `[dance-of-tal] ready. loaded tools=${loadedTools.length} mode=${process.env.DANCE_OF_TAL_TOOLS ?? "standard"} names=${loadedTools.join(",")}`
+    `[dance-of-tal] ready. loaded tools=${loadedTools.length} mode=${process.env.DANCE_OF_TAL_TOOLS ?? "core"} names=${loadedTools.join(",")}`
   );
 }
 

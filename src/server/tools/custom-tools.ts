@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createCustomCombo } from "../../cli/dot-config.js";
+import { createCustomCombo, updateCombo, updateCustomDance, updateCustomTal } from "../../cli/dot-config.js";
 import type { Dance, Tal } from "../../data/types.js";
 import { buildCustomDance, buildCustomTal, buildCustomTalDance, resolveUnifiedSources } from "../../lib/customize.js";
 import { resolveProjectTarget, sanitizePath } from "../project-target.js";
@@ -52,6 +52,24 @@ const stageContextSchema = z.object({
   threadsBaseUrl: z.string().url().optional(),
   threadsApiVersion: z.string().optional(),
   threadsFetchLimit: z.number().int().min(1).max(20).optional()
+});
+
+const danceStyleExampleSchema = z.object({
+  input: z.string().min(1),
+  output: z.string().min(1),
+  label: z.string().optional(),
+  notes: z.string().optional()
+});
+
+const danceAntiPatternSchema = z.object({
+  bad: z.string().min(1),
+  better: z.string().optional(),
+  reason: z.string().optional()
+});
+
+const danceExemplarSetSchema = z.object({
+  styleExamples: z.array(danceStyleExampleSchema).min(1).max(12),
+  antiPatterns: z.array(danceAntiPatternSchema).max(12).optional()
 });
 
 const buildAutoInputPreview = ({
@@ -322,6 +340,234 @@ export const registerCustomTools = ({
               inputMode: "unified-auto-detect",
               inputPreview: buildAutoInputPreview({ input, inputs })
             }
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return textResult({ error: message });
+        }
+      }
+    );
+  });
+
+  registerTool("update_custom_tal", () => {
+    server.tool(
+      "update_custom_tal",
+      "Update a persisted custom Tal in .dance-of-tal/config.json by talId.",
+      {
+        talId: z.string().min(1),
+        slug: z.string().optional(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        featuredScore: z.number().optional(),
+        createdAt: z.string().optional(),
+        thinking: z.string().optional(),
+        projectDir: z.string().optional()
+      },
+      async ({ talId, slug, name, description, category, tags, featuredScore, createdAt, thinking, projectDir }) => {
+        try {
+          const target = await resolveProjectTarget({ projectDir: sanitizePath(projectDir) ?? undefined });
+          if (!target.ok) return textResult({ error: target.error, checked: target.checked });
+
+          const patch = {
+            slug,
+            name,
+            description,
+            category,
+            tags,
+            featuredScore,
+            createdAt,
+            thinking
+          };
+
+          if (Object.values(patch).every((value) => value === undefined)) {
+            return textResult({ error: "At least one Tal field is required to update." });
+          }
+
+          const result = await updateCustomTal({
+            projectDir: target.projectDir,
+            talId,
+            patch
+          });
+
+          if (!result) return textResult({ error: `Custom Tal not found: ${talId}` });
+
+          const normalizedTalId = talId.trim();
+          const updatedTal = result.config.customTals.find((item) => item.id === normalizedTalId)?.tal ?? null;
+          const impactedComboIds = result.config.combos
+            .filter((combo) => combo.talRef?.kind === "custom" && combo.talRef.id === normalizedTalId)
+            .map((combo) => combo.id);
+
+          return textResult({
+            message: "Custom Tal updated.",
+            talId: normalizedTalId,
+            tal: updatedTal,
+            impactedComboIds,
+            activeComboId: result.config.activeComboId,
+            projectDir: result.projectDir,
+            configPath: result.configPath
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return textResult({ error: message });
+        }
+      }
+    );
+  });
+
+  registerTool("update_custom_dance", () => {
+    server.tool(
+      "update_custom_dance",
+      "Update a persisted custom Dance in .dance-of-tal/config.json by danceId.",
+      {
+        danceId: z.string().min(1),
+        slug: z.string().optional(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        rules: z.string().optional(),
+        exemplarSet: danceExemplarSetSchema.optional(),
+        clearExemplarSet: z.boolean().optional(),
+        projectDir: z.string().optional()
+      },
+      async ({ danceId, slug, name, description, category, rules, exemplarSet, clearExemplarSet, projectDir }) => {
+        try {
+          if (clearExemplarSet && exemplarSet) {
+            return textResult({ error: "clearExemplarSet and exemplarSet cannot be used together." });
+          }
+
+          const target = await resolveProjectTarget({ projectDir: sanitizePath(projectDir) ?? undefined });
+          if (!target.ok) return textResult({ error: target.error, checked: target.checked });
+
+          const patch = {
+            slug,
+            name,
+            description,
+            category,
+            rules,
+            exemplarSet: clearExemplarSet ? null : exemplarSet
+          };
+
+          if (Object.values(patch).every((value) => value === undefined)) {
+            return textResult({ error: "At least one Dance field is required to update." });
+          }
+
+          const result = await updateCustomDance({
+            projectDir: target.projectDir,
+            danceId,
+            patch
+          });
+
+          if (!result) return textResult({ error: `Custom Dance not found: ${danceId}` });
+
+          const normalizedDanceId = danceId.trim();
+          const updatedDance = result.config.customDances.find((item) => item.id === normalizedDanceId)?.dance ?? null;
+          const impactedComboIds = result.config.combos
+            .filter((combo) => combo.danceRef?.kind === "custom" && combo.danceRef.id === normalizedDanceId)
+            .map((combo) => combo.id);
+
+          return textResult({
+            message: "Custom Dance updated.",
+            danceId: normalizedDanceId,
+            dance: updatedDance,
+            impactedComboIds,
+            activeComboId: result.config.activeComboId,
+            projectDir: result.projectDir,
+            configPath: result.configPath
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return textResult({ error: message });
+        }
+      }
+    );
+  });
+
+  registerTool("update_combo", () => {
+    server.tool(
+      "update_combo",
+      "Update combo name and/or Tal/Dance references in .dance-of-tal/config.json.",
+      {
+        comboId: z.string().min(1),
+        name: z.string().optional(),
+        talSlug: z.string().optional(),
+        customTalId: z.string().optional(),
+        clearTal: z.boolean().optional(),
+        danceSlug: z.string().optional(),
+        customDanceId: z.string().optional(),
+        clearDance: z.boolean().optional(),
+        activate: z.boolean().optional(),
+        projectDir: z.string().optional()
+      },
+      async ({
+        comboId,
+        name,
+        talSlug,
+        customTalId,
+        clearTal,
+        danceSlug,
+        customDanceId,
+        clearDance,
+        activate,
+        projectDir
+      }) => {
+        try {
+          if (clearTal && (talSlug || customTalId)) {
+            return textResult({ error: "clearTal cannot be combined with talSlug/customTalId." });
+          }
+          if (clearDance && (danceSlug || customDanceId)) {
+            return textResult({ error: "clearDance cannot be combined with danceSlug/customDanceId." });
+          }
+          if (talSlug && customTalId) {
+            return textResult({ error: "Use only one of talSlug or customTalId." });
+          }
+          if (danceSlug && customDanceId) {
+            return textResult({ error: "Use only one of danceSlug or customDanceId." });
+          }
+
+          const talRef = clearTal
+            ? null
+            : talSlug
+              ? { kind: "preset" as const, slug: talSlug.trim() }
+              : customTalId
+                ? { kind: "custom" as const, id: customTalId.trim() }
+                : undefined;
+
+          const danceRef = clearDance
+            ? null
+            : danceSlug
+              ? { kind: "preset" as const, slug: danceSlug.trim() }
+              : customDanceId
+                ? { kind: "custom" as const, id: customDanceId.trim() }
+                : undefined;
+
+          if (name === undefined && talRef === undefined && danceRef === undefined && activate === undefined) {
+            return textResult({ error: "No update fields provided. Pass name, tal/dance refs, or activate." });
+          }
+
+          const target = await resolveProjectTarget({ projectDir: sanitizePath(projectDir) ?? undefined });
+          if (!target.ok) return textResult({ error: target.error, checked: target.checked });
+
+          const result = await updateCombo({
+            projectDir: target.projectDir,
+            comboId,
+            name,
+            talRef,
+            danceRef,
+            activate
+          });
+
+          if (!result) return textResult({ error: `Combo not found: ${comboId}` });
+
+          const normalizedComboId = comboId.trim();
+          const combo = result.config.combos.find((item) => item.id === normalizedComboId) ?? null;
+          return textResult({
+            message: "Combo updated.",
+            combo,
+            activeComboId: result.config.activeComboId,
+            projectDir: result.projectDir,
+            configPath: result.configPath
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

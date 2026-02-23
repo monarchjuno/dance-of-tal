@@ -531,6 +531,260 @@ export const renameCombo = async ({ projectDir, comboId, name }: { projectDir?: 
   return saveAndReturn(resolvedProjectDir, nextConfig);
 };
 
+const applyRequiredStringPatch = (current: string, next: string | undefined, fieldName: string) => {
+  if (next === undefined) return current;
+  const trimmed = next.trim();
+  if (!trimmed) throw new Error(`${fieldName} cannot be empty`);
+  return trimmed;
+};
+
+const applyOptionalScorePatch = (current: number, next: number | undefined) => {
+  if (next === undefined) return current;
+  if (!Number.isFinite(next)) throw new Error("featuredScore must be a finite number");
+  return next;
+};
+
+const normalizeTagPatch = (next: string[] | undefined) => {
+  if (next === undefined) return undefined;
+  return next.map((item) => item.trim()).filter(Boolean).slice(0, 16);
+};
+
+const normalizeExemplarPatch = (value: Dance["exemplarSet"] | null | undefined): Dance["exemplarSet"] | null | undefined => {
+  if (value === undefined || value === null) return value;
+
+  const styleExamples = Array.isArray(value.styleExamples)
+    ? value.styleExamples
+        .map((item) => ({
+          input: item.input?.trim() ?? "",
+          output: item.output?.trim() ?? "",
+          ...(item.label?.trim() ? { label: item.label.trim() } : {}),
+          ...(item.notes?.trim() ? { notes: item.notes.trim() } : {})
+        }))
+        .filter((item) => item.input.length > 0 && item.output.length > 0)
+        .slice(0, 12)
+    : [];
+
+  if (styleExamples.length === 0) {
+    throw new Error("exemplarSet.styleExamples must include at least one input/output pair");
+  }
+
+  const antiPatterns = Array.isArray(value.antiPatterns)
+    ? value.antiPatterns
+        .map((item) => ({
+          bad: item.bad?.trim() ?? "",
+          ...(item.better?.trim() ? { better: item.better.trim() } : {}),
+          ...(item.reason?.trim() ? { reason: item.reason.trim() } : {})
+        }))
+        .filter((item) => item.bad.length > 0)
+        .slice(0, 12)
+    : [];
+
+  return antiPatterns.length > 0 ? { styleExamples, antiPatterns } : { styleExamples };
+};
+
+export const updateCustomTal = async ({
+  projectDir,
+  talId,
+  patch
+}: {
+  projectDir?: string;
+  talId: string;
+  patch: Partial<Pick<Tal, "slug" | "name" | "description" | "category" | "tags" | "featuredScore" | "createdAt" | "thinking">>;
+}) => {
+  const normalizedTalId = talId.trim();
+  if (!normalizedTalId) throw new Error("talId is required");
+
+  const resolvedProjectDir = resolveProjectDir(projectDir);
+  const config = await readOrInitProjectConfig(resolvedProjectDir);
+  const now = nowISO();
+  const nextTags = normalizeTagPatch(patch.tags);
+
+  let found = false;
+  const nextCustomTals = config.customTals.map((item) => {
+    if (item.id !== normalizedTalId) return item;
+    found = true;
+
+    const nextTal: Tal = {
+      ...item.tal,
+      slug: applyRequiredStringPatch(item.tal.slug, patch.slug, "tal.slug"),
+      name: applyRequiredStringPatch(item.tal.name, patch.name, "tal.name"),
+      description: applyRequiredStringPatch(item.tal.description, patch.description, "tal.description"),
+      category: applyRequiredStringPatch(item.tal.category, patch.category, "tal.category"),
+      tags: nextTags ?? item.tal.tags,
+      featuredScore: applyOptionalScorePatch(item.tal.featuredScore, patch.featuredScore),
+      createdAt: applyRequiredStringPatch(item.tal.createdAt, patch.createdAt, "tal.createdAt"),
+      thinking: applyRequiredStringPatch(item.tal.thinking, patch.thinking, "tal.thinking")
+    };
+
+    return {
+      ...item,
+      tal: nextTal
+    };
+  });
+
+  if (!found) return null;
+
+  const nextConfig: DotConfig = {
+    ...config,
+    updatedAt: now,
+    customTals: nextCustomTals,
+    combos: config.combos.map((combo) =>
+      combo.talRef?.kind === "custom" && combo.talRef.id === normalizedTalId
+        ? {
+            ...combo,
+            updatedAt: now
+          }
+        : combo
+    )
+  };
+
+  return saveAndReturn(resolvedProjectDir, nextConfig);
+};
+
+export const updateCustomDance = async ({
+  projectDir,
+  danceId,
+  patch
+}: {
+  projectDir?: string;
+  danceId: string;
+  patch: Partial<Pick<Dance, "slug" | "name" | "description" | "category" | "rules">> & { exemplarSet?: Dance["exemplarSet"] | null };
+}) => {
+  const normalizedDanceId = danceId.trim();
+  if (!normalizedDanceId) throw new Error("danceId is required");
+
+  const resolvedProjectDir = resolveProjectDir(projectDir);
+  const config = await readOrInitProjectConfig(resolvedProjectDir);
+  const now = nowISO();
+  const nextExemplarSet = normalizeExemplarPatch(patch.exemplarSet);
+
+  let found = false;
+  const nextCustomDances = config.customDances.map((item) => {
+    if (item.id !== normalizedDanceId) return item;
+    found = true;
+
+    const baseDance: Dance = {
+      ...item.dance,
+      slug: applyRequiredStringPatch(item.dance.slug, patch.slug, "dance.slug"),
+      name: applyRequiredStringPatch(item.dance.name, patch.name, "dance.name"),
+      description: applyRequiredStringPatch(item.dance.description, patch.description, "dance.description"),
+      category: applyRequiredStringPatch(item.dance.category, patch.category, "dance.category"),
+      rules: applyRequiredStringPatch(item.dance.rules, patch.rules, "dance.rules")
+    };
+
+    const nextDance: Dance =
+      nextExemplarSet === undefined
+        ? baseDance
+        : nextExemplarSet === null
+          ? (() => {
+              const { exemplarSet: _removed, ...withoutExemplar } = baseDance;
+              return withoutExemplar;
+            })()
+          : { ...baseDance, exemplarSet: nextExemplarSet };
+
+    return {
+      ...item,
+      dance: nextDance
+    };
+  });
+
+  if (!found) return null;
+
+  const nextConfig: DotConfig = {
+    ...config,
+    updatedAt: now,
+    customDances: nextCustomDances,
+    combos: config.combos.map((combo) =>
+      combo.danceRef?.kind === "custom" && combo.danceRef.id === normalizedDanceId
+        ? {
+            ...combo,
+            updatedAt: now
+          }
+        : combo
+    )
+  };
+
+  return saveAndReturn(resolvedProjectDir, nextConfig);
+};
+
+const validateTalRef = (config: DotConfig, talRef: DotTalRef | null) => {
+  if (!talRef) return;
+  if (talRef.kind === "preset") {
+    if (!talRef.slug.trim()) throw new Error("talRef.slug cannot be empty");
+    return;
+  }
+
+  const exists = config.customTals.some((item) => item.id === talRef.id);
+  if (!exists) throw new Error(`Custom Tal not found: ${talRef.id}`);
+};
+
+const validateDanceRef = (config: DotConfig, danceRef: DotDanceRef | null) => {
+  if (!danceRef) return;
+  if (danceRef.kind === "preset") {
+    if (!danceRef.slug.trim()) throw new Error("danceRef.slug cannot be empty");
+    return;
+  }
+
+  const exists = config.customDances.some((item) => item.id === danceRef.id);
+  if (!exists) throw new Error(`Custom Dance not found: ${danceRef.id}`);
+};
+
+export const updateCombo = async ({
+  projectDir,
+  comboId,
+  name,
+  talRef,
+  danceRef,
+  activate
+}: {
+  projectDir?: string;
+  comboId: string;
+  name?: string;
+  talRef?: DotTalRef | null;
+  danceRef?: DotDanceRef | null;
+  activate?: boolean;
+}) => {
+  const normalizedComboId = comboId.trim();
+  if (!normalizedComboId) throw new Error("comboId is required");
+
+  const resolvedProjectDir = resolveProjectDir(projectDir);
+  const config = await readOrInitProjectConfig(resolvedProjectDir);
+  const current = config.combos.find((combo) => combo.id === normalizedComboId);
+  if (!current) return null;
+
+  const resolvedTalRef = talRef === undefined ? current.talRef : talRef;
+  const resolvedDanceRef = danceRef === undefined ? current.danceRef : danceRef;
+
+  if (!resolvedTalRef && !resolvedDanceRef) {
+    throw new Error("combo must keep at least one of talRef or danceRef");
+  }
+
+  validateTalRef(config, resolvedTalRef);
+  validateDanceRef(config, resolvedDanceRef);
+
+  const now = nowISO();
+  const trimmedName = name?.trim();
+  if (name !== undefined && !trimmedName) throw new Error("combo name cannot be empty");
+
+  const nextCombo: DotCombo = {
+    ...current,
+    name: trimmedName ?? current.name,
+    talRef: resolvedTalRef,
+    danceRef: resolvedDanceRef,
+    updatedAt: now
+  };
+
+  const nextConfig: DotConfig = {
+    ...config,
+    updatedAt: now,
+    combos: config.combos.map((combo) => (combo.id === normalizedComboId ? nextCombo : combo)),
+    activeComboId: activate ? normalizedComboId : config.activeComboId,
+    history: activate ? [...config.history, { comboId: normalizedComboId, setAt: now }].slice(-50) : config.history
+  };
+
+  return saveAndReturn(resolvedProjectDir, nextConfig);
+};
+
 export const clearActiveCombo = async (projectDir?: string) => {
   const resolvedProjectDir = resolveProjectDir(projectDir);
   const config = await readOrInitProjectConfig(resolvedProjectDir);
