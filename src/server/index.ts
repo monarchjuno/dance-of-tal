@@ -5,7 +5,7 @@ import { textResult } from "./response-utils.js";
 import { registerCatalogTools } from "./tools/catalog-tools.js";
 import { registerCustomTools } from "./tools/custom-tools.js";
 import { registerGptsTools } from "./tools/gpts-tools.js";
-import { registerWorkflowTools } from "./tools/workflow-tools.js";
+import { registerActTools } from "./tools/act-tools.js";
 import type { ToolName } from "./toolset.js";
 import { resolveToolSet } from "./toolset.js";
 
@@ -24,7 +24,7 @@ const registerTool = (name: ToolName, register: () => void) => {
   loadedTools.push(name);
 };
 
-registerWorkflowTools({ server, registerTool, textResult });
+registerActTools({ server, registerTool, textResult });
 registerCatalogTools({ server, registerTool, textResult });
 registerCustomTools({ server, registerTool, textResult });
 registerGptsTools({ server, registerTool, textResult });

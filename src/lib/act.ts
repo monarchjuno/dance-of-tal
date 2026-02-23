@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { recommendGptsByNeed } from "./gpts.js";
-import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal, getRecommendedCombos, listDances, listTals } from "./persona.js";
+import { buildActPrompt, buildOutputPrompt, buildThinkingPrompt, findAct, findDance, findTal, getRecommendedCombos, listDances, listTals } from "./persona.js";
 
-export type WorkflowFilters = {
+export type ActFilters = {
   talCategory?: string;
   danceCategory?: string;
   tag?: string;
@@ -11,7 +11,7 @@ export type WorkflowFilters = {
   limitCombos?: number;
 };
 
-export type WorkflowComboOption = {
+export type ActComboOption = {
   rank: number;
   comboName: string;
   talSlug: string;
@@ -23,7 +23,7 @@ export type WorkflowComboOption = {
   reason: string;
 };
 
-export type WorkflowTalOption = {
+export type ActTalOption = {
   slug: string;
   name: string;
   category: string;
@@ -31,7 +31,7 @@ export type WorkflowTalOption = {
   tags: string[];
 };
 
-export type WorkflowDanceOption = {
+export type ActDanceOption = {
   slug: string;
   name: string;
   category: string;
@@ -40,36 +40,38 @@ export type WorkflowDanceOption = {
   structure: string[];
 };
 
-export type WorkflowRecommendation = {
+export type ActRecommendation = {
   need: string;
   matchedHintIds: string[];
-  talOptions: WorkflowTalOption[];
-  danceOptions: WorkflowDanceOption[];
-  comboOptions: WorkflowComboOption[];
-  nextBestCombo: WorkflowComboOption | null;
+  talOptions: ActTalOption[];
+  danceOptions: ActDanceOption[];
+  comboOptions: ActComboOption[];
+  nextBestCombo: ActComboOption | null;
 };
 
 export type ActiveComboState = {
   talSlug: string | null;
   danceSlug: string | null;
+  actSlug: string | null;
+  stage: string | null;
   comboName: string;
   setAt: string;
 };
 
-export type WorkflowSession = {
+export type ActSession = {
   id: string;
   goal: string;
   language: string;
   projectDir?: string;
   createdAt: string;
   updatedAt: string;
-  filters: WorkflowFilters;
+  filters: ActFilters;
   activeCombo: ActiveComboState | null;
   history: ActiveComboState[];
-  recommendation: WorkflowRecommendation;
+  recommendation: ActRecommendation;
 };
 
-const sessions = new Map<string, WorkflowSession>();
+const sessions = new Map<string, ActSession>();
 
 const DEFAULT_LIMIT_TAL = 6;
 const DEFAULT_LIMIT_DANCE = 8;
@@ -104,7 +106,7 @@ const dedupeBySlug = <T extends { slug: string }>(items: T[]) => {
   return Array.from(map.values());
 };
 
-const buildFallbackTals = (need: string, filters: WorkflowFilters): WorkflowTalOption[] => {
+const buildFallbackTals = (need: string, filters: ActFilters): ActTalOption[] => {
   const withQuery = listTals({ query: need, category: filters.talCategory });
   const source = withQuery.length > 0 ? withQuery : listTals({ category: filters.talCategory });
   const items = source.map((item) => ({
@@ -117,7 +119,7 @@ const buildFallbackTals = (need: string, filters: WorkflowFilters): WorkflowTalO
   return items.filter((item) => hasTag(item.tags, filters.tag));
 };
 
-const buildFallbackDances = (need: string, filters: WorkflowFilters): WorkflowDanceOption[] => {
+const buildFallbackDances = (need: string, filters: ActFilters): ActDanceOption[] => {
   const withQuery = listDances({ query: need, category: filters.danceCategory });
   const source = withQuery.length > 0 ? withQuery : listDances({ category: filters.danceCategory });
   const items = source.map((item) => ({
@@ -133,14 +135,14 @@ const buildFallbackDances = (need: string, filters: WorkflowFilters): WorkflowDa
   return items.filter((item) => [...item.tone, ...item.structure].some((token) => lower(token) === lower(filters.tag ?? "")));
 };
 
-const buildRecommendation = (need: string, filters: WorkflowFilters, triedComboKeys: Set<string>): WorkflowRecommendation => {
+const buildRecommendation = (need: string, filters: ActFilters, triedComboKeys: Set<string>): ActRecommendation => {
   const limitTal = filters.limitTal ?? DEFAULT_LIMIT_TAL;
   const limitDance = filters.limitDance ?? DEFAULT_LIMIT_DANCE;
   const limitCombos = filters.limitCombos ?? DEFAULT_LIMIT_COMBOS;
 
   const byNeed = recommendGptsByNeed(need, limitTal, limitDance);
 
-  const talFromNeed: WorkflowTalOption[] = byNeed.recommendedTals
+  const talFromNeed: ActTalOption[] = byNeed.recommendedTals
     .map((tal) => ({
       slug: tal.s,
       name: tal.n,
@@ -150,7 +152,7 @@ const buildRecommendation = (need: string, filters: WorkflowFilters, triedComboK
     }))
     .filter((tal) => categoryMatch(tal.category, filters.talCategory) && hasTag(tal.tags, filters.tag));
 
-  const danceFromNeed: WorkflowDanceOption[] = byNeed.recommendedDances
+  const danceFromNeed: ActDanceOption[] = byNeed.recommendedDances
     .map((dance) => ({
       slug: dance.s,
       name: dance.n,
@@ -166,11 +168,11 @@ const buildRecommendation = (need: string, filters: WorkflowFilters, triedComboK
   const danceOptions = dedupeBySlug(danceFromNeed.length > 0 ? danceFromNeed : buildFallbackDances(need, filters)).slice(0, limitDance);
 
   const danceSlugSet = new Set(danceOptions.map((dance) => dance.slug));
-  const combos: WorkflowComboOption[] = [];
+  const combos: ActComboOption[] = [];
 
   for (const tal of talOptions) {
     const recommendations = getRecommendedCombos({ talSlug: tal.slug, limit: 8 });
-    if (!recommendations || !("recommendedDances" in recommendations)) continue;
+    if (!recommendations || !("recommendedDances" in recommendations) || !recommendations.recommendedDances) continue;
 
     for (const dance of recommendations.recommendedDances) {
       if (danceSlugSet.size > 0 && !danceSlugSet.has(dance.slug)) continue;
@@ -217,7 +219,7 @@ const buildRecommendation = (need: string, filters: WorkflowFilters, triedComboK
     }
   }
 
-  const uniqueCombos: WorkflowComboOption[] = [];
+  const uniqueCombos: ActComboOption[] = [];
   const seen = new Set<string>();
   for (const combo of combos) {
     const key = `${combo.talSlug}__${combo.danceSlug}`;
@@ -238,23 +240,28 @@ const buildRecommendation = (need: string, filters: WorkflowFilters, triedComboK
   };
 };
 
-const buildPromptPack = ({ talSlug, danceSlug }: { talSlug: string | null; danceSlug: string | null }) => {
+const buildPromptPack = ({ talSlug, danceSlug, actSlug }: { talSlug: string | null; danceSlug: string | null; actSlug: string | null }) => {
   const tal = talSlug ? findTal(talSlug) : null;
   const dance = danceSlug ? findDance(danceSlug) : null;
+  const act = actSlug ? findAct(actSlug) : null;
 
   if (talSlug && !tal) return null;
   if (danceSlug && !dance) return null;
-  if (!tal && !dance) return null;
+  if (actSlug && !act) return null;
+  if (!tal && !dance && !act) return null;
 
   const thinkingPrompt = tal ? buildThinkingPrompt(tal) : null;
   const outputPrompt = dance ? buildOutputPrompt(dance) : null;
-  const combinedPrompt = [buildSystemInstructionHeader(), thinkingPrompt, outputPrompt].filter(Boolean).join("\n\n");
+  const actPrompt = act ? buildActPrompt(act) : null;
+  const combinedPrompt = [buildSystemInstructionHeader(), thinkingPrompt, actPrompt, outputPrompt].filter(Boolean).join("\n\n");
 
   return {
     tal,
     dance,
+    act,
     thinkingPrompt,
     outputPrompt,
+    actPrompt,
     combinedPrompt
   };
 };
@@ -282,10 +289,10 @@ export const initializeStylingSession = ({
 }) => {
   const id = randomUUID();
   const now = new Date().toISOString();
-  const filters: WorkflowFilters = { talCategory, danceCategory, tag, limitTal, limitDance, limitCombos };
+  const filters: ActFilters = { talCategory, danceCategory, tag, limitTal, limitDance, limitCombos };
   const recommendation = buildRecommendation(goal, filters, new Set());
 
-  const session: WorkflowSession = {
+  const session: ActSession = {
     id,
     goal,
     language: language?.trim() || "English",
@@ -334,7 +341,7 @@ export const nextComboRecommendation = ({
   const session = sessions.get(sessionId);
   if (!session) return null;
 
-  const filters: WorkflowFilters = {
+  const filters: ActFilters = {
     talCategory: talCategory ?? session.filters.talCategory,
     danceCategory: danceCategory ?? session.filters.danceCategory,
     tag: tag ?? session.filters.tag,
@@ -367,11 +374,15 @@ export const setActiveCombo = ({
   sessionId,
   talSlug,
   danceSlug,
+  actSlug,
+  stage,
   comboName
 }: {
   sessionId: string;
   talSlug?: string;
   danceSlug?: string;
+  actSlug?: string;
+  stage?: string;
   comboName?: string;
 }) => {
   const session = sessions.get(sessionId);
@@ -379,14 +390,16 @@ export const setActiveCombo = ({
 
   const normalizedTalSlug = talSlug?.trim() || null;
   const normalizedDanceSlug = danceSlug?.trim() || null;
-  if (!normalizedTalSlug && !normalizedDanceSlug) return null;
+  const normalizedActSlug = actSlug?.trim() || null;
+  const normalizedStage = stage?.trim() || null;
+  if (!normalizedTalSlug && !normalizedDanceSlug && !normalizedActSlug && !normalizedStage) return null;
 
-  const promptPack = buildPromptPack({ talSlug: normalizedTalSlug, danceSlug: normalizedDanceSlug });
+  const promptPack = buildPromptPack({ talSlug: normalizedTalSlug, danceSlug: normalizedDanceSlug, actSlug: normalizedActSlug });
   if (!promptPack) return null;
 
   const now = new Date().toISOString();
-  const resolvedComboName = comboName?.trim() || [promptPack.tal?.name, promptPack.dance?.name].filter(Boolean).join(" x ") || "Custom Combo";
-  const activeCombo: ActiveComboState = { talSlug: normalizedTalSlug, danceSlug: normalizedDanceSlug, comboName: resolvedComboName, setAt: now };
+  const resolvedComboName = comboName?.trim() || [promptPack.tal?.name, promptPack.dance?.name, promptPack.act?.name, normalizedStage].filter(Boolean).join(" x ") || "Custom Combo";
+  const activeCombo: ActiveComboState = { talSlug: normalizedTalSlug, danceSlug: normalizedDanceSlug, actSlug: normalizedActSlug, stage: normalizedStage, comboName: resolvedComboName, setAt: now };
 
   session.activeCombo = activeCombo;
   session.history = [...session.history, activeCombo].slice(-20);
@@ -410,7 +423,7 @@ export const setActiveCombo = ({
 
 export const getSession = (sessionId: string) => sessions.get(sessionId) ?? null;
 
-export const upsertSession = (session: WorkflowSession) => {
+export const upsertSession = (session: ActSession) => {
   sessions.set(session.id, session);
   return session;
 };
@@ -433,7 +446,7 @@ export const runActiveCombo = ({ sessionId, task }: { sessionId: string; task: s
   const session = sessions.get(sessionId);
   if (!session || !session.activeCombo) return null;
 
-  const promptPack = buildPromptPack({ talSlug: session.activeCombo.talSlug, danceSlug: session.activeCombo.danceSlug });
+  const promptPack = buildPromptPack({ talSlug: session.activeCombo.talSlug, danceSlug: session.activeCombo.danceSlug, actSlug: session.activeCombo.actSlug });
   if (!promptPack) return null;
 
   return {
@@ -441,6 +454,8 @@ export const runActiveCombo = ({ sessionId, task }: { sessionId: string; task: s
     comboName: session.activeCombo.comboName,
     talSlug: session.activeCombo.talSlug,
     danceSlug: session.activeCombo.danceSlug,
+    actSlug: session.activeCombo.actSlug,
+    stage: session.activeCombo.stage,
     package: ["SYSTEM:", promptPack.combinedPrompt, "", "USER:", task].join("\n")
   };
 };
@@ -465,7 +480,7 @@ export const clearSession = ({ sessionId, archive = false }: { sessionId: string
   };
 };
 
-export const getWorkflowOverview = () => ({
+export const getActOverview = () => ({
   flow: [
     {
       step: 1,

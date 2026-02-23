@@ -680,7 +680,7 @@ export const buildCustomTal = async (input: BuildCustomTalInput) => {
   const tal: Tal = {
     slug,
     name: name.endsWith("Tal") ? name : `${name} Tal`,
-    description: input.description?.trim() || `Custom Tal generated from user-provided sources for ${category.toLowerCase()} workflows.`,
+    description: input.description?.trim() || `Custom Tal generated from user-provided sources for ${category.toLowerCase()} acts.`,
     category,
     tags,
     featuredScore: 110,

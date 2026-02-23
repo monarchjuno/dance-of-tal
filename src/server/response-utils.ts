@@ -1,4 +1,4 @@
-import type { WorkflowComboOption, WorkflowRecommendation } from "../lib/workflow.js";
+import type { ActComboOption, ActRecommendation } from "../lib/act.js";
 
 export const SYSTEM_INSTRUCTION_HEADER = [
   "System Instruction:",
@@ -7,7 +7,7 @@ export const SYSTEM_INSTRUCTION_HEADER = [
   "Keep reasoning disciplined and produce outputs and behavior that match the required tone, format, and operating constraints."
 ].join("\n");
 
-const summarizeComboOption = (combo: WorkflowComboOption) => ({
+const summarizeComboOption = (combo: ActComboOption) => ({
   talSlug: combo.talSlug,
   talName: combo.talName,
   danceSlug: combo.danceSlug,
@@ -15,7 +15,7 @@ const summarizeComboOption = (combo: WorkflowComboOption) => ({
   reason: combo.reason
 });
 
-export const summarizeRecommendation = (recommendation: WorkflowRecommendation, limit = 5) => ({
+export const summarizeRecommendation = (recommendation: ActRecommendation, limit = 5) => ({
   matchedHintIds: recommendation.matchedHintIds,
   nextBestCombo: recommendation.nextBestCombo ? summarizeComboOption(recommendation.nextBestCombo) : null,
   comboOptions: recommendation.comboOptions.slice(0, limit).map(summarizeComboOption)

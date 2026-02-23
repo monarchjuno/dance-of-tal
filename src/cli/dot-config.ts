@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import * as lockfile from "proper-lockfile";
 import { z } from "zod";
 import { Dance, Tal } from "../data/types.js";
 
@@ -12,6 +13,11 @@ const talRefSchema = z.discriminatedUnion("kind", [
 ]);
 
 const danceRefSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("preset"), slug: z.string().min(1) }),
+  z.object({ kind: z.literal("custom"), id: z.string().min(1) })
+]);
+
+const actRefSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("preset"), slug: z.string().min(1) }),
   z.object({ kind: z.literal("custom"), id: z.string().min(1) })
 ]);
@@ -33,6 +39,8 @@ const comboSchema = z.object({
   name: z.string().min(1),
   talRef: talRefSchema.nullable(),
   danceRef: danceRefSchema.nullable(),
+  actRef: actRefSchema.nullable().optional(),
+  stage: z.string().nullable().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1)
 });
@@ -54,6 +62,7 @@ const dotConfigSchema = z.object({
 
 export type DotTalRef = z.infer<typeof talRefSchema>;
 export type DotDanceRef = z.infer<typeof danceRefSchema>;
+export type DotActRef = z.infer<typeof actRefSchema>;
 export type DotCombo = z.infer<typeof comboSchema>;
 export type DotConfig = z.infer<typeof dotConfigSchema>;
 
@@ -151,21 +160,21 @@ const normalizeDanceExemplarSet = (rawDance: Record<string, unknown>) => {
     if (styleExamples.length > 0) {
       const antiPatterns = Array.isArray(exemplarSet.antiPatterns)
         ? exemplarSet.antiPatterns
-            .map((item) => (isRecord(item) ? item : null))
-            .filter((item): item is Record<string, unknown> => Boolean(item))
-            .map((item) => {
-              const bad = normalizeString(item.bad);
-              const better = normalizeString(item.better);
-              const reason = normalizeString(item.reason);
-              if (!bad) return null;
-              return {
-                bad,
-                ...(better ? { better } : {}),
-                ...(reason ? { reason } : {})
-              };
-            })
-            .filter((item): item is { bad: string; better?: string; reason?: string } => Boolean(item))
-            .slice(0, 8)
+          .map((item) => (isRecord(item) ? item : null))
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => {
+            const bad = normalizeString(item.bad);
+            const better = normalizeString(item.better);
+            const reason = normalizeString(item.reason);
+            if (!bad) return null;
+            return {
+              bad,
+              ...(better ? { better } : {}),
+              ...(reason ? { reason } : {})
+            };
+          })
+          .filter((item): item is { bad: string; better?: string; reason?: string } => Boolean(item))
+          .slice(0, 8)
         : [];
 
       return {
@@ -283,12 +292,14 @@ const buildDefaultConfig = (): DotConfig => ({
   history: []
 });
 
-const resolveDefaultComboName = ({ name, talSlug, danceSlug }: { name?: string; talSlug?: string | null; danceSlug?: string | null }) => {
+const resolveDefaultComboName = ({ name, talSlug, danceSlug, actSlug, stage }: { name?: string; talSlug?: string | null; danceSlug?: string | null; actSlug?: string | null; stage?: string | null }) => {
   const trimmed = name?.trim();
   if (trimmed) return trimmed;
   if (talSlug && danceSlug) return `${talSlug} x ${danceSlug}`;
   if (talSlug) return `${talSlug} Tal Focus`;
   if (danceSlug) return `${danceSlug} Dance Mode`;
+  if (actSlug) return `${actSlug} Act Sequence`;
+  if (stage) return `${stage} Stage Target`;
   return `combo-${new Date().toISOString().slice(0, 10)}`;
 };
 
@@ -307,7 +318,16 @@ export const getConfigPaths = (projectDir?: string) => {
 const persistConfig = async (projectDir: string, config: DotConfig) => {
   const paths = getConfigPaths(projectDir);
   await mkdir(paths.dotDir, { recursive: true });
-  await writeFile(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+
+  let release = () => Promise.resolve();
+  try {
+    release = await lockfile.lock(paths.dotDir, {
+      retries: { retries: 5, minTimeout: 100, maxTimeout: 1000 }
+    });
+    await writeFile(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  } finally {
+    await release().catch(() => { });
+  }
   return paths;
 };
 
@@ -336,7 +356,14 @@ export const initProjectConfig = async (projectDir?: string) => {
 
 export const readProjectConfig = async (projectDir?: string): Promise<DotConfig | null> => {
   const paths = getConfigPaths(projectDir);
+  let release = () => Promise.resolve();
+
   try {
+    await mkdir(paths.dotDir, { recursive: true });
+    release = await lockfile.lock(paths.dotDir, {
+      retries: { retries: 3, minTimeout: 50, maxTimeout: 500 }
+    });
+
     const raw = await readFile(paths.configPath, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     const normalized = normalizeDotConfigShape(parsed);
@@ -346,7 +373,7 @@ export const readProjectConfig = async (projectDir?: string): Promise<DotConfig 
       const parsedStable = JSON.stringify(parsed);
       const normalizedStable = JSON.stringify(strict.data);
       if (parsedStable !== normalizedStable) {
-        await persistConfig(paths.projectDir, strict.data);
+        await writeFile(paths.configPath, `${JSON.stringify(strict.data, null, 2)}\n`, "utf8");
       }
       return strict.data;
     }
@@ -355,6 +382,8 @@ export const readProjectConfig = async (projectDir?: string): Promise<DotConfig 
   } catch (error) {
     if (isNotFoundError(error)) return null;
     throw error;
+  } finally {
+    await release().catch(() => { });
   }
 };
 
@@ -369,18 +398,24 @@ export const createPresetCombo = async ({
   name,
   talSlug,
   danceSlug,
+  actSlug,
+  stage,
   activate = true
 }: {
   projectDir?: string;
   name?: string;
   talSlug?: string;
   danceSlug?: string;
+  actSlug?: string;
+  stage?: string;
   activate?: boolean;
 }) => {
   const normalizedTalSlug = talSlug?.trim() || null;
   const normalizedDanceSlug = danceSlug?.trim() || null;
-  if (!normalizedTalSlug && !normalizedDanceSlug) {
-    throw new Error("talSlug or danceSlug is required");
+  const normalizedActSlug = actSlug?.trim() || null;
+  const normalizedStage = stage?.trim() || null;
+  if (!normalizedTalSlug && !normalizedDanceSlug && !normalizedActSlug && !normalizedStage) {
+    throw new Error("At least one configuration target (Tal, Dance, Act, Stage) must be provided");
   }
 
   return createComboFromRefs({
@@ -388,6 +423,8 @@ export const createPresetCombo = async ({
     name,
     talRef: normalizedTalSlug ? { kind: "preset", slug: normalizedTalSlug } : null,
     danceRef: normalizedDanceSlug ? { kind: "preset", slug: normalizedDanceSlug } : null,
+    actRef: normalizedActSlug ? { kind: "preset", slug: normalizedActSlug } : null,
+    stage: normalizedStage,
     activate
   });
 };
@@ -397,18 +434,24 @@ export const createComboFromRefs = async ({
   name,
   talRef,
   danceRef,
+  actRef,
+  stage,
   activate = true
 }: {
   projectDir?: string;
   name?: string;
   talRef?: DotTalRef | null;
   danceRef?: DotDanceRef | null;
+  actRef?: DotActRef | null;
+  stage?: string | null;
   activate?: boolean;
 }) => {
   const normalizedTalRef = talRef ?? null;
   const normalizedDanceRef = danceRef ?? null;
-  if (!normalizedTalRef && !normalizedDanceRef) {
-    throw new Error("talRef or danceRef is required");
+  const normalizedActRef = actRef ?? null;
+  const normalizedStage = stage?.trim() || null;
+  if (!normalizedTalRef && !normalizedDanceRef && !normalizedActRef && !normalizedStage) {
+    throw new Error("At least one configuration target reference must be provided");
   }
 
   const resolvedProjectDir = resolveProjectDir(projectDir);
@@ -418,12 +461,15 @@ export const createComboFromRefs = async ({
 
   const talLabel = normalizedTalRef ? (normalizedTalRef.kind === "preset" ? normalizedTalRef.slug : "custom-tal") : null;
   const danceLabel = normalizedDanceRef ? (normalizedDanceRef.kind === "preset" ? normalizedDanceRef.slug : "custom-dance") : null;
+  const actLabel = normalizedActRef ? (normalizedActRef.kind === "preset" ? normalizedActRef.slug : "custom-act") : null;
 
   const combo: DotCombo = {
     id: comboId,
-    name: resolveDefaultComboName({ name, talSlug: talLabel, danceSlug: danceLabel }),
+    name: resolveDefaultComboName({ name, talSlug: talLabel, danceSlug: danceLabel, actSlug: actLabel, stage: normalizedStage }),
     talRef: normalizedTalRef,
     danceRef: normalizedDanceRef,
+    actRef: normalizedActRef,
+    stage: normalizedStage,
     createdAt: now,
     updatedAt: now
   };
@@ -554,14 +600,14 @@ const normalizeExemplarPatch = (value: Dance["exemplarSet"] | null | undefined):
 
   const styleExamples = Array.isArray(value.styleExamples)
     ? value.styleExamples
-        .map((item) => ({
-          input: item.input?.trim() ?? "",
-          output: item.output?.trim() ?? "",
-          ...(item.label?.trim() ? { label: item.label.trim() } : {}),
-          ...(item.notes?.trim() ? { notes: item.notes.trim() } : {})
-        }))
-        .filter((item) => item.input.length > 0 && item.output.length > 0)
-        .slice(0, 12)
+      .map((item) => ({
+        input: item.input?.trim() ?? "",
+        output: item.output?.trim() ?? "",
+        ...(item.label?.trim() ? { label: item.label.trim() } : {}),
+        ...(item.notes?.trim() ? { notes: item.notes.trim() } : {})
+      }))
+      .filter((item) => item.input.length > 0 && item.output.length > 0)
+      .slice(0, 12)
     : [];
 
   if (styleExamples.length === 0) {
@@ -570,13 +616,13 @@ const normalizeExemplarPatch = (value: Dance["exemplarSet"] | null | undefined):
 
   const antiPatterns = Array.isArray(value.antiPatterns)
     ? value.antiPatterns
-        .map((item) => ({
-          bad: item.bad?.trim() ?? "",
-          ...(item.better?.trim() ? { better: item.better.trim() } : {}),
-          ...(item.reason?.trim() ? { reason: item.reason.trim() } : {})
-        }))
-        .filter((item) => item.bad.length > 0)
-        .slice(0, 12)
+      .map((item) => ({
+        bad: item.bad?.trim() ?? "",
+        ...(item.better?.trim() ? { better: item.better.trim() } : {}),
+        ...(item.reason?.trim() ? { reason: item.reason.trim() } : {})
+      }))
+      .filter((item) => item.bad.length > 0)
+      .slice(0, 12)
     : [];
 
   return antiPatterns.length > 0 ? { styleExamples, antiPatterns } : { styleExamples };
@@ -631,9 +677,9 @@ export const updateCustomTal = async ({
     combos: config.combos.map((combo) =>
       combo.talRef?.kind === "custom" && combo.talRef.id === normalizedTalId
         ? {
-            ...combo,
-            updatedAt: now
-          }
+          ...combo,
+          updatedAt: now
+        }
         : combo
     )
   };
@@ -677,9 +723,9 @@ export const updateCustomDance = async ({
         ? baseDance
         : nextExemplarSet === null
           ? (() => {
-              const { exemplarSet: _removed, ...withoutExemplar } = baseDance;
-              return withoutExemplar;
-            })()
+            const { exemplarSet: _removed, ...withoutExemplar } = baseDance;
+            return withoutExemplar;
+          })()
           : { ...baseDance, exemplarSet: nextExemplarSet };
 
     return {
@@ -697,9 +743,9 @@ export const updateCustomDance = async ({
     combos: config.combos.map((combo) =>
       combo.danceRef?.kind === "custom" && combo.danceRef.id === normalizedDanceId
         ? {
-            ...combo,
-            updatedAt: now
-          }
+          ...combo,
+          updatedAt: now
+        }
         : combo
     )
   };
@@ -735,6 +781,8 @@ export const updateCombo = async ({
   name,
   talRef,
   danceRef,
+  actRef,
+  stage,
   activate
 }: {
   projectDir?: string;
@@ -742,6 +790,8 @@ export const updateCombo = async ({
   name?: string;
   talRef?: DotTalRef | null;
   danceRef?: DotDanceRef | null;
+  actRef?: DotActRef | null;
+  stage?: string | null;
   activate?: boolean;
 }) => {
   const normalizedComboId = comboId.trim();
@@ -754,13 +804,16 @@ export const updateCombo = async ({
 
   const resolvedTalRef = talRef === undefined ? current.talRef : talRef;
   const resolvedDanceRef = danceRef === undefined ? current.danceRef : danceRef;
+  const resolvedActRef = actRef === undefined ? current.actRef : actRef;
+  const resolvedStage = stage === undefined ? current.stage : stage;
 
-  if (!resolvedTalRef && !resolvedDanceRef) {
-    throw new Error("combo must keep at least one of talRef or danceRef");
+  if (!resolvedTalRef && !resolvedDanceRef && !resolvedActRef && !resolvedStage) {
+    throw new Error("combo must keep at least one of talRef, danceRef, actRef, or stage");
   }
 
   validateTalRef(config, resolvedTalRef);
   validateDanceRef(config, resolvedDanceRef);
+  validateActRef(config, resolvedActRef);
 
   const now = nowISO();
   const trimmedName = name?.trim();
@@ -771,6 +824,8 @@ export const updateCombo = async ({
     name: trimmedName ?? current.name,
     talRef: resolvedTalRef,
     danceRef: resolvedDanceRef,
+    actRef: resolvedActRef,
+    stage: resolvedStage,
     updatedAt: now
   };
 

@@ -3,10 +3,12 @@ import { z } from "zod";
 import {
   buildOpenClawProfile,
   buildPrompt,
+  findAct,
   findDance,
   findTal,
   getDataSummary,
   getRecommendedCombos,
+  listActs,
   listDanceCategories,
   listDances,
   listTals,
@@ -45,6 +47,20 @@ export const registerCatalogTools = ({
       const tal = findTal(slug);
       if (!tal) return textResult({ error: `Tal not found: ${slug}` });
       return textResult(tal);
+    });
+  });
+
+  registerTool("list_acts", () => {
+    server.tool("list_acts", "List Act items", {}, async () => {
+      return textResult({ items: listActs() });
+    });
+  });
+
+  registerTool("get_act", () => {
+    server.tool("get_act", "Get full Act sequence", { slug: z.string().min(1) }, async ({ slug }) => {
+      const act = findAct(slug);
+      if (!act) return textResult({ error: `Act not found: ${slug}` });
+      return textResult(act);
     });
   });
 
@@ -120,13 +136,13 @@ export const registerCatalogTools = ({
       "build_prompt",
       "Build Tal x Dance prompt",
       {
-        talSlug: z.string().min(1),
-        danceSlug: z.string().min(1),
-        mode: z.enum(["thinking", "output", "combined"]).optional()
+        talSlug: z.string().min(1).optional(),
+        danceSlug: z.string().min(1).optional(),
+        actSlug: z.string().min(1).optional()
       },
-      async ({ talSlug, danceSlug, mode }) => {
-        const prompts = buildPrompt(talSlug, danceSlug, mode ?? "combined");
-        if (!prompts) return textResult({ error: "Tal or Dance not found" });
+      async ({ talSlug, danceSlug, actSlug }) => {
+        const prompts = buildPrompt({ talSlug, danceSlug, actSlug });
+        if (!prompts) return textResult({ error: "Tal, Dance, or Act not found" });
         return textResult(prompts);
       }
     );
@@ -137,13 +153,14 @@ export const registerCatalogTools = ({
       "quick_apply",
       "Build quick apply package",
       {
-        talSlug: z.string().min(1),
-        danceSlug: z.string().min(1),
+        talSlug: z.string().min(1).optional(),
+        danceSlug: z.string().min(1).optional(),
+        actSlug: z.string().min(1).optional(),
         task: z.string().min(1)
       },
-      async ({ talSlug, danceSlug, task }) => {
-        const output = quickApply({ talSlug, danceSlug, task });
-        if (!output) return textResult({ error: "Tal or Dance not found" });
+      async ({ talSlug, danceSlug, actSlug, task }) => {
+        const output = quickApply({ talSlug, danceSlug, actSlug, task });
+        if (!output) return textResult({ error: "Tal, Dance, or Act not found" });
         return textResult({ package: output });
       }
     );

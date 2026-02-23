@@ -9,6 +9,13 @@ export type Tal = {
   thinking: string;
 };
 
+export type Act = {
+  slug: string;
+  name: string;
+  description: string;
+  steps: string[];
+};
+
 export type DanceStyleExample = {
   input: string;
   output: string;

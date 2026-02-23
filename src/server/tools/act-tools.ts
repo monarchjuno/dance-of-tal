@@ -1,22 +1,22 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createPresetCombo, readProjectConfig } from "../../cli/dot-config.js";
-import { clearWorkflowSessionInFile, getWorkflowSessionById, listWorkflowSessionsFromFile, upsertWorkflowSession } from "../../cli/dot-session-config.js";
+import { clearActSessionInFile, getActSessionById, listActSessionsFromFile, upsertActSession } from "../../cli/dot-session-config.js";
 import type { DotConfig, DotDanceRef, DotTalRef } from "../../cli/dot-config.js";
 import type { Dance, Tal } from "../../data/types.js";
-import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal } from "../../lib/persona.js";
+import { buildOutputPrompt, buildThinkingPrompt, findAct, findDance, findTal } from "../../lib/persona.js";
 import {
   clearSession,
   getSession,
-  getWorkflowOverview,
+  getActOverview,
   initializeStylingSession,
   nextComboRecommendation,
   runActiveCombo,
   setActiveCombo,
   upsertSession,
   removeSession
-} from "../../lib/workflow.js";
-import type { WorkflowSession } from "../../lib/workflow.js";
+} from "../../lib/act.js";
+import type { ActSession } from "../../lib/act.js";
 import { resolveProjectCandidates, resolveProjectTarget, sanitizePath } from "../project-target.js";
 import { SYSTEM_INSTRUCTION_HEADER, summarizeRecommendation } from "../response-utils.js";
 import { SOURCE_TYPES, buildSetupModeAdvice } from "../setup-mode.js";
@@ -43,7 +43,7 @@ const resolveSessionById = async ({ sessionId, projectDir }: { sessionId: string
 
   const candidates = await resolveProjectCandidates({ projectDir });
   for (const candidate of candidates) {
-    const { session } = await getWorkflowSessionById({ projectDir: candidate, sessionId });
+    const { session } = await getActSessionById({ projectDir: candidate, sessionId });
     if (session) {
       upsertSession(session);
       return { session, source: "file" as const, projectDir: candidate };
@@ -53,7 +53,7 @@ const resolveSessionById = async ({ sessionId, projectDir }: { sessionId: string
   return null;
 };
 
-const persistSession = async ({ projectDir, session }: { projectDir?: string; session: WorkflowSession | null }) => {
+const persistSession = async ({ projectDir, session }: { projectDir?: string; session: ActSession | null }) => {
   if (!session) return { persisted: false, error: "No session to persist." };
   const target = await resolveProjectTarget({
     projectDir,
@@ -68,7 +68,7 @@ const persistSession = async ({ projectDir, session }: { projectDir?: string; se
     projectDir: target.projectDir
   };
   upsertSession(normalized);
-  await upsertWorkflowSession({ projectDir: target.projectDir, session: normalized });
+  await upsertActSession({ projectDir: target.projectDir, session: normalized });
   return {
     persisted: true,
     projectDir: target.projectDir,
@@ -76,7 +76,7 @@ const persistSession = async ({ projectDir, session }: { projectDir?: string; se
   };
 };
 
-export const registerWorkflowTools = ({
+export const registerActTools = ({
   server,
   registerTool,
   textResult
@@ -85,8 +85,8 @@ export const registerWorkflowTools = ({
   registerTool: RegisterTool;
   textResult: TextResult;
 }) => {
-  registerTool("workflow_overview", () => {
-    server.tool("workflow_overview", "Show workflow for Tal x Dance", {}, async () => textResult(getWorkflowOverview()));
+  registerTool("act_overview", () => {
+    server.tool("act_overview", "Show act for Tal x Dance", {}, async () => textResult(getActOverview()));
   });
 
   registerTool("advise_setup_mode", () => {
@@ -117,7 +117,7 @@ export const registerWorkflowTools = ({
   registerTool("initialize_styling_session", () => {
     server.tool(
       "initialize_styling_session",
-      "Start a Tal x Dance workflow session by goal",
+      "Start a Tal x Dance act session by goal",
       {
         goal: z.string().min(3),
         language: z.string().optional(),
@@ -292,20 +292,23 @@ export const registerWorkflowTools = ({
   registerTool("set_active_combo", () => {
     server.tool(
       "set_active_combo",
-      "Lock active Tal and Dance combo in session (Tal-only or Dance-only is also allowed)",
+      "Lock active combo in session (any combination of Tal, Dance, Act, Stage)",
       {
         sessionId: z.string().min(1).optional(),
         talSlug: z.string().min(1).optional(),
         danceSlug: z.string().min(1).optional(),
+        actSlug: z.string().min(1).optional(),
+        stage: z.string().min(1).optional(),
         comboName: z.string().optional(),
         projectDir: z.string().optional(),
         persist: z.boolean().optional(),
         verbose: z.boolean().optional()
       },
-      async ({ sessionId, talSlug, danceSlug, comboName, projectDir, persist, verbose }) => {
-        if (!talSlug && !danceSlug) return textResult({ error: "talSlug or danceSlug is required" });
+      async ({ sessionId, talSlug, danceSlug, actSlug, stage, comboName, projectDir, persist, verbose }) => {
+        if (!talSlug && !danceSlug && !actSlug && !stage) return textResult({ error: "At least one of talSlug, danceSlug, actSlug, or stage is required" });
         if (talSlug && !findTal(talSlug)) return textResult({ error: `Tal not found: ${talSlug}` });
         if (danceSlug && !findDance(danceSlug)) return textResult({ error: `Dance not found: ${danceSlug}` });
+        if (actSlug && !findAct(actSlug)) return textResult({ error: `Act not found: ${actSlug}` });
 
         let resolvedSessionId = sessionId?.trim();
         let autoSessionCreated = false;
@@ -329,7 +332,7 @@ export const registerWorkflowTools = ({
           autoSessionCreated = true;
         }
 
-        let result = setActiveCombo({ sessionId: resolvedSessionId, talSlug, danceSlug, comboName });
+        let result = setActiveCombo({ sessionId: resolvedSessionId, talSlug, danceSlug, actSlug, stage, comboName });
         if (!result) {
           const target = await resolveProjectTarget({ projectDir, sessionProjectDir });
           const recovered = initializeStylingSession({
@@ -340,7 +343,7 @@ export const registerWorkflowTools = ({
           resolvedSessionId = recovered.session.id;
           sessionProjectDir = recovered.session.projectDir;
           autoSessionCreated = true;
-          result = setActiveCombo({ sessionId: resolvedSessionId, talSlug, danceSlug, comboName });
+          result = setActiveCombo({ sessionId: resolvedSessionId, talSlug, danceSlug, actSlug, stage, comboName });
         }
         if (!result) return textResult({ error: "Failed to set active combo" });
 
@@ -358,6 +361,8 @@ export const registerWorkflowTools = ({
                 projectDir: target.projectDir,
                 talSlug: result.activeCombo.tal?.slug ?? undefined,
                 danceSlug: result.activeCombo.dance?.slug ?? undefined,
+                actSlug: result.activeCombo.actSlug ?? undefined,
+                stage: result.activeCombo.stage ?? undefined,
                 name: result.activeCombo.comboName,
                 activate: true
               });
@@ -383,7 +388,9 @@ export const registerWorkflowTools = ({
           activeCombo: {
             comboName: result.activeCombo.comboName,
             tal: result.activeCombo.tal,
-            dance: result.activeCombo.dance
+            dance: result.activeCombo.dance,
+            actSlug: result.activeCombo.actSlug,
+            stage: result.activeCombo.stage
           },
           sessionPersistence: sessionPersistence.persisted ? { persisted: true } : { persisted: false, error: sessionPersistence.error },
           comboPersistence,
@@ -396,7 +403,7 @@ export const registerWorkflowTools = ({
   registerTool("get_session", () => {
     server.tool(
       "get_session",
-      "Get workflow session snapshot",
+      "Get act session snapshot",
       { sessionId: z.string().min(1), projectDir: z.string().optional() },
       async ({ sessionId, projectDir }) => {
         const resolved = await resolveSessionById({ sessionId, projectDir });
@@ -407,12 +414,12 @@ export const registerWorkflowTools = ({
   });
 
   registerTool("list_sessions", () => {
-    server.tool("list_sessions", "List active workflow sessions", { projectDir: z.string().optional() }, async ({ projectDir }) => {
+    server.tool("list_sessions", "List active act sessions", { projectDir: z.string().optional() }, async ({ projectDir }) => {
       const target = await resolveProjectTarget({ projectDir });
       if (!target.ok) {
         return textResult({ items: [], warning: target.error });
       }
-      const sessions = await listWorkflowSessionsFromFile(target.projectDir);
+      const sessions = await listActSessionsFromFile(target.projectDir);
       return textResult({
         items: sessions.map((session) => ({
           id: session.id,
@@ -444,6 +451,8 @@ export const registerWorkflowTools = ({
                 comboName: sessionResult.comboName,
                 talSlug: sessionResult.talSlug,
                 danceSlug: sessionResult.danceSlug,
+                actSlug: sessionResult.actSlug,
+                stage: sessionResult.stage,
                 package: sessionResult.package
               });
             }
@@ -481,9 +490,13 @@ export const registerWorkflowTools = ({
 
         const tal = resolveTalFromRef(config, combo.talRef);
         const dance = resolveDanceFromRef(config, combo.danceRef);
-        if (!tal && !dance) {
+
+        // We do not have resolveActFromRef explicitly yet, but if it's preset we can just find it
+        const act = combo.actRef?.kind === "preset" ? findAct(combo.actRef.slug) ?? null : null;
+
+        if (!tal && !dance && !act) {
           return textResult({
-            error: "Active combo has no valid Tal/Dance references.",
+            error: "Active combo has no valid Tal/Dance/Act references.",
             comboId: combo.id,
             projectDir: target.projectDir
           });
@@ -491,12 +504,15 @@ export const registerWorkflowTools = ({
 
         const thinkingPrompt = tal ? buildThinkingPrompt(tal) : null;
         const outputPrompt = dance ? buildOutputPrompt(dance) : null;
-        const combinedPrompt = [SYSTEM_INSTRUCTION_HEADER, thinkingPrompt, outputPrompt].filter(Boolean).join("\n\n");
+        const actPrompt = act ? buildActPrompt(act) : null;
+        const combinedPrompt = [SYSTEM_INSTRUCTION_HEADER, thinkingPrompt, actPrompt, outputPrompt].filter(Boolean).join("\n\n");
         const payload = {
           source: "local-config",
           comboName: combo.name,
           talSlug: tal?.slug ?? null,
           danceSlug: dance?.slug ?? null,
+          actSlug: act?.slug ?? null,
+          stage: combo.stage ?? null,
           package: ["SYSTEM:", combinedPrompt, "", "USER:", task].join("\n")
         };
         return textResult(verbose ? { ...payload, projectDir: target.projectDir, configPath: target.configPath } : payload);
@@ -514,7 +530,7 @@ export const registerWorkflowTools = ({
         if (!existing) return textResult({ error: `Session not found: ${sessionId}` });
 
         const result = clearSession({ sessionId, archive: archive ?? false });
-        const fileResult = await clearWorkflowSessionInFile({
+        const fileResult = await clearActSessionInFile({
           projectDir: projectDir ?? existing.projectDir ?? existing.session.projectDir,
           sessionId,
           archive: archive ?? false

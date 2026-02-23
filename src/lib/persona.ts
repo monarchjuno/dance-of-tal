@@ -1,6 +1,7 @@
+import { acts } from "../data/acts.js";
 import { dances } from "../data/dances.js";
 import { tals } from "../data/tals.js";
-import { Dance, Tal } from "../data/types.js";
+import { Act, Dance, Tal } from "../data/types.js";
 import { dataSummary, recommendedCombos } from "../data/catalog.js";
 import { getDanceCategories, getDanceCategory, recommendDanceCategoriesForTal } from "./danceCategory.js";
 import { collectDanceRuleTokens, resolveDanceExamples, resolveDanceExemplarSet, resolveDanceRuleText, summarizeDanceRule } from "./dance-schema.js";
@@ -22,11 +23,11 @@ export type OpenClawProfileInput = {
   includeTaskStarter?: boolean;
 };
 
-const buildSystemInstructionHeader = () =>
+export const buildSystemInstructionHeader = () =>
   [
     "System Instruction:",
     "You are an AI assistant.",
-    "Follow the reasoning rules first, then produce output using the response style rules.",
+    "Follow the reasoning rules first, execute process steps, and then produce output using the response style rules.",
     "Keep reasoning disciplined and produce outputs and behavior that match the required tone, format, and operating constraints."
   ].join("\n");
 
@@ -39,6 +40,7 @@ export const findDance = (slug: string): Dance | undefined => {
   const dance = dances.find((item) => item.slug === slug);
   return dance ? normalizeDance(dance) : undefined;
 };
+export const findAct = (slug: string): Act | undefined => acts.find((act) => act.slug === slug);
 
 export const listTals = ({ query, category, tags }: ListInput) => {
   const normalizedQuery = query?.toLowerCase().trim() ?? "";
@@ -54,6 +56,14 @@ export const listTals = ({ query, category, tags }: ListInput) => {
       return matchQuery && matchCategory && matchTags;
     })
     .map((tal) => ({ slug: tal.slug, name: tal.name, description: tal.description, category: tal.category, tags: tal.tags }));
+};
+
+export const listActs = () => {
+  return acts.map((act) => ({
+    slug: act.slug,
+    name: act.name,
+    description: act.description
+  }));
 };
 
 export const listDances = ({ query, category, tags }: ListInput) => {
@@ -175,34 +185,62 @@ export const buildOutputPrompt = (dance: Dance) => {
     .join("\n");
 };
 
-export const buildPrompt = (talSlug: string, danceSlug: string, mode: BuildMode = "combined") => {
-  const tal = findTal(talSlug);
-  const dance = findDance(danceSlug);
+export const buildActPrompt = (act: Act) => {
+  return [
+    "Process Sequence Rules:",
+    `Act Profile: ${act.name}`,
+    `Description: ${act.description}`,
+    "Required Steps:",
+    ...act.steps.map((step, index) => `${index + 1}. ${step}`)
+  ].join("\n");
+};
 
-  if (!tal || !dance) {
+export const buildPrompt = ({
+  talSlug,
+  danceSlug,
+  actSlug,
+}: {
+  talSlug?: string | null;
+  danceSlug?: string | null;
+  actSlug?: string | null;
+}) => {
+  const tal = talSlug ? findTal(talSlug) : undefined;
+  const dance = danceSlug ? findDance(danceSlug) : undefined;
+  const act = actSlug ? findAct(actSlug) : undefined;
+
+  if (!tal && !dance && !act) {
     return null;
   }
 
-  const thinkingPrompt = buildThinkingPrompt(tal);
-  const outputPrompt = buildOutputPrompt(dance);
-  const combinedPrompt = [buildSystemInstructionHeader(), thinkingPrompt, outputPrompt].join("\n\n");
+  const thinkingPrompt = tal ? buildThinkingPrompt(tal) : null;
+  const outputPrompt = dance ? buildOutputPrompt(dance) : null;
+  const actPrompt = act ? buildActPrompt(act) : null;
 
-  if (mode === "thinking") {
-    return { thinkingPrompt, outputPrompt, combinedPrompt, prompt: thinkingPrompt };
-  }
+  const combinedPrompt = [
+    buildSystemInstructionHeader(),
+    thinkingPrompt,
+    actPrompt,
+    outputPrompt
+  ].filter(Boolean).join("\n\n");
 
-  if (mode === "output") {
-    return { thinkingPrompt, outputPrompt, combinedPrompt, prompt: outputPrompt };
-  }
-
-  return { thinkingPrompt, outputPrompt, combinedPrompt, prompt: combinedPrompt };
+  return { tal, dance, act, thinkingPrompt, outputPrompt, actPrompt, combinedPrompt };
 };
 
-export const quickApply = ({ talSlug, danceSlug, task }: { talSlug: string; danceSlug: string; task: string }) => {
-  const prompts = buildPrompt(talSlug, danceSlug, "combined");
+export const quickApply = ({ talSlug, danceSlug, actSlug, task }: { talSlug?: string | null; danceSlug?: string | null; actSlug?: string | null; task: string }) => {
+  const prompts = buildPrompt({ talSlug, danceSlug, actSlug });
   if (!prompts) return null;
 
-  return ["SYSTEM:", buildSystemInstructionHeader(), "", prompts.thinkingPrompt, "", prompts.outputPrompt, "", "USER:", task].join("\n");
+  return [
+    "SYSTEM:",
+    buildSystemInstructionHeader(),
+    "",
+    prompts.thinkingPrompt ?? "",
+    prompts.actPrompt ? `\n${prompts.actPrompt}\n` : "",
+    prompts.outputPrompt ?? "",
+    "",
+    "USER:",
+    task
+  ].filter(Boolean).join("\n");
 };
 
 export const buildOpenClawProfile = ({
@@ -215,7 +253,7 @@ export const buildOpenClawProfile = ({
 }: OpenClawProfileInput) => {
   const tal = findTal(talSlug);
   const dance = findDance(danceSlug);
-  const prompts = buildPrompt(talSlug, danceSlug, "combined");
+  const prompts = buildPrompt({ talSlug, danceSlug });
 
   if (!tal || !dance || !prompts) {
     return null;
@@ -258,13 +296,13 @@ export const buildOpenClawProfile = ({
     },
     starterPackage: includeTaskStarter
       ? {
-          userTaskTemplate: "Replace with your real task.",
-          quickApply: quickApply({
-            talSlug,
-            danceSlug,
-            task: "Replace with your real task."
-          })
-        }
+        userTaskTemplate: "Replace with your real task.",
+        quickApply: quickApply({
+          talSlug,
+          danceSlug,
+          task: "Replace with your real task."
+        })
+      }
       : null
   };
 };

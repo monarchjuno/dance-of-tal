@@ -2,8 +2,10 @@
 
 Personal AI behavior engine for Tal x Dance.
 
-`Tal` is your thinking profile. `Dance` is your output pattern.
-Apply one, the other, or both per project.
+`Tal` is your thinking profile. `Dance` is your output pattern. `Act` is your sequential workflow logic.
+`Stage` is your target execution environment (e.g., standard MCP, custom GPTs, Threads).
+
+Apply any combination of them per project.
 
 [Website](https://dance-of-tal.vercel.app) · [Connect Guide](https://dance-of-tal.vercel.app/connect) · [MCP Guide](https://dance-of-tal.vercel.app/mcp-guide) · [OpenClaw](https://openclaw.ai)
 
@@ -12,7 +14,7 @@ Apply one, the other, or both per project.
 - Project-level behavior control via `.dance-of-tal/config.json`
 - MCP server for hosts like Windsurf, Claude Desktop, Cursor, and OpenClaw flows
 - CLI-first UX with `dot` commands (`pick`, `lock`, `deploy`, `switch`, `doctor`)
-- Preset and custom Tal/Dance abstraction from one unified input (auto-detects text/file/url)
+- Preset and custom Tal/Dance/Act abstraction from one unified input (auto-detects text/file/url)
 
 ## Install (recommended)
 
@@ -88,7 +90,7 @@ Set my Tal and Dance.
 Richer one-line prompt:
 
 ```text
-Set my Tal and Dance for [my goal]. Use preset first, then ask if I want custom tuning.
+Set my Tal, Dance, and Act for [my goal]. Use preset first, then ask if I want custom tuning.
 ```
 
 ## MCP host config (stdio)
@@ -120,7 +122,7 @@ Tool profile guidance:
 ## Highlights
 
 - Workflow-first MCP tools: initialize, recommend, apply, run
-- Flexible modes: Combo, Tal-only, Dance-only
+- Flexible modes: Combo, Tal-only, Dance-only, Act sequences
 - Local persistence: config + sessions inside `.dance-of-tal/`
 - Compact GPTs endpoints support via the web app data pipeline
 - OpenClaw-friendly profile generation (`build_openclaw_profile`)
@@ -144,7 +146,7 @@ Core flow:
 ```bash
 dot init
 dot pick tal --query founder
-dot lock --tal <tal-slug> [--dance <dance-slug>] --name "My Combo"
+dot lock --tal <tal-slug> [--dance <dance-slug>] [--act <act-slug>] --name "My Combo"
 dot deploy --stage mcp --task "Your real task"
 ```
 
@@ -177,19 +179,19 @@ dot config path
 dot doctor --target windsurf
 ```
 
-Deploy stage notes:
+## Deploy Stages
 
-- `dot deploy --stage gpts`: returns GPT instructions payload
-- `dot deploy --stage mcp`: returns SYSTEM/USER package and runnable command
-- `dot deploy --stage openclaw`: returns OpenClaw-ready system prompt hints
-- `dot deploy --stage threads`: returns post brief
-- `dot deploy --stage threads --publish --text "..."`
-  posts directly via Threads Graph API using token/userId from `.dance-of-tal/channels.json` or `.dance-of-tal/.env`
-  and automatically splits long text into a reply-chain thread (500-char segment limit per post)
+Once your behavior (Tal/Dance/Act) is locked, you can "deploy" it to a specific environment called a **Stage**. Each stage packages and formats the instructions differently:
 
-## Custom Tal/Dance generation
+- **mcp** (`--stage mcp`): Returns a SYSTEM/USER package and a runnable command tailored for use via MCP hosts (Windsurf, Cursor, Claude Desktop).
+- **gpts** (`--stage gpts`): Returns a consolidated instructions payload ready to be pasted into the Custom GPT Builder.
+- **openclaw** (`--stage openclaw`): Returns hints and system prompts optimized for OpenClaw assistant profiles.
+- **threads** (`--stage threads`): Returns a high-engagement post brief based on output styles.
+  - Can post directly (`--stage threads --publish --text "..."`) via the Threads Graph API, automatically splitting long text into a reply-chain thread (500-char segment limit per post). Token/userId are retrieved from `.dance-of-tal/channels.json` or `.dance-of-tal/.env`.
 
-Custom and abstraction tools use one unified input field.  
+## Custom Generation
+
+Custom and abstraction tools use one unified input field.
 You can pass free text, file paths, URLs, or mixed context in the same request.
 
 ```json

@@ -1,21 +1,28 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import * as lockfile from "proper-lockfile";
+import { z } from "zod";
 import { getConfigPaths } from "./dot-config.js";
-import type { WorkflowSession } from "../lib/workflow.js";
+import type { ActSession } from "../lib/act.js";
 
 const SESSION_SCHEMA_VERSION = "1.0.0";
 
-type ArchivedWorkflowSession = {
-  archivedAt: string;
-  session: WorkflowSession;
-};
+const actSessionSchema = z.custom<ActSession>();
 
-type DotSessionState = {
-  schemaVersion: string;
-  updatedAt: string;
-  sessions: WorkflowSession[];
-  archived: ArchivedWorkflowSession[];
-};
+const archivedActSessionSchema = z.object({
+  archivedAt: z.string().min(1),
+  session: actSessionSchema
+});
+
+const dotSessionStateSchema = z.object({
+  schemaVersion: z.string().min(1),
+  updatedAt: z.string().min(1),
+  sessions: z.array(actSessionSchema),
+  archived: z.array(archivedActSessionSchema)
+});
+
+type ArchivedActSession = z.infer<typeof archivedActSessionSchema>;
+type DotSessionState = z.infer<typeof dotSessionStateSchema>;
 
 const nowISO = () => new Date().toISOString();
 
@@ -38,34 +45,62 @@ export const getSessionPaths = (projectDir?: string) => {
 };
 
 const readSessionState = async (projectDir?: string): Promise<DotSessionState> => {
-  const { sessionsPath } = getSessionPaths(projectDir);
+  const { dotDir, sessionsPath } = getSessionPaths(projectDir);
+  let release = () => Promise.resolve();
+
   try {
+    await mkdir(dotDir, { recursive: true });
+    release = await lockfile.lock(dotDir, {
+      retries: { retries: 3, minTimeout: 50, maxTimeout: 500 }
+    });
+
     const raw = await readFile(sessionsPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<DotSessionState>;
-    return {
+    const parsed = JSON.parse(raw);
+
+    const normalized = {
       schemaVersion: typeof parsed.schemaVersion === "string" ? parsed.schemaVersion : SESSION_SCHEMA_VERSION,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : nowISO(),
-      sessions: Array.isArray(parsed.sessions) ? (parsed.sessions as WorkflowSession[]) : [],
-      archived: Array.isArray(parsed.archived) ? (parsed.archived as ArchivedWorkflowSession[]) : []
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      archived: Array.isArray(parsed.archived) ? parsed.archived : []
     };
+
+    const strict = dotSessionStateSchema.safeParse(normalized);
+    if (strict.success) {
+      const parsedStable = JSON.stringify(parsed);
+      const normalizedStable = JSON.stringify(strict.data);
+      if (parsedStable !== normalizedStable) {
+        await writeFile(sessionsPath, `${JSON.stringify(strict.data, null, 2)}\n`, "utf8");
+      }
+      return strict.data;
+    }
+
+    throw strict.error;
   } catch (error) {
     if (isNotFoundError(error)) return buildDefaultSessionState();
     throw error;
+  } finally {
+    await release().catch(() => { });
   }
 };
 
 const persistSessionState = async (projectDir: string, state: DotSessionState) => {
-  const paths = getSessionPaths(projectDir);
-  await mkdir(paths.dotDir, { recursive: true });
-  await writeFile(
-    paths.sessionsPath,
-    `${JSON.stringify({ ...state, updatedAt: nowISO(), schemaVersion: SESSION_SCHEMA_VERSION }, null, 2)}\n`,
-    "utf8"
-  );
-  return paths;
+  const { dotDir, sessionsPath } = getSessionPaths(projectDir);
+  await mkdir(dotDir, { recursive: true });
+
+  let release = () => Promise.resolve();
+  try {
+    release = await lockfile.lock(dotDir, {
+      retries: { retries: 5, minTimeout: 100, maxTimeout: 1000 }
+    });
+    const finalState = { ...state, updatedAt: nowISO(), schemaVersion: SESSION_SCHEMA_VERSION };
+    await writeFile(sessionsPath, `${JSON.stringify(finalState, null, 2)}\n`, "utf8");
+  } finally {
+    await release().catch(() => { });
+  }
+  return { projectDir, dotDir, sessionsPath };
 };
 
-export const upsertWorkflowSession = async ({ projectDir, session }: { projectDir?: string; session: WorkflowSession }) => {
+export const upsertActSession = async ({ projectDir, session }: { projectDir?: string; session: ActSession }) => {
   const resolvedProjectDir = getSessionPaths(projectDir).projectDir;
   const state = await readSessionState(resolvedProjectDir);
   const nextSessions = [...state.sessions.filter((item) => item.id !== session.id), session];
@@ -77,18 +112,18 @@ export const upsertWorkflowSession = async ({ projectDir, session }: { projectDi
   return { ...paths, session };
 };
 
-export const getWorkflowSessionById = async ({ projectDir, sessionId }: { projectDir?: string; sessionId: string }) => {
+export const getActSessionById = async ({ projectDir, sessionId }: { projectDir?: string; sessionId: string }) => {
   const state = await readSessionState(projectDir);
   const session = state.sessions.find((item) => item.id === sessionId) ?? null;
   return { state, session };
 };
 
-export const listWorkflowSessionsFromFile = async (projectDir?: string) => {
+export const listActSessionsFromFile = async (projectDir?: string) => {
   const state = await readSessionState(projectDir);
   return state.sessions;
 };
 
-export const clearWorkflowSessionInFile = async ({
+export const clearActSessionInFile = async ({
   projectDir,
   sessionId,
   archive
@@ -107,14 +142,14 @@ export const clearWorkflowSessionInFile = async ({
   const nextSession = archive
     ? null
     : {
-        ...session,
-        activeCombo: null,
-        updatedAt: nowISO()
-      };
+      ...session,
+      activeCombo: null,
+      updatedAt: nowISO()
+    };
 
   const nextState: DotSessionState = {
     ...state,
-    sessions: archive ? remaining : [...remaining, nextSession as WorkflowSession],
+    sessions: archive ? remaining : [...remaining, nextSession as ActSession],
     archived: nextArchived
   };
 

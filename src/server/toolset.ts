@@ -1,5 +1,5 @@
 export const ALL_TOOLS = [
-  "workflow_overview",
+  "act_overview",
   "advise_setup_mode",
   "initialize_styling_session",
   "next_combo",
@@ -12,6 +12,8 @@ export const ALL_TOOLS = [
   "get_tal",
   "list_dances",
   "get_dance",
+  "list_acts",
+  "get_act",
   "list_dance_categories",
   "recommend_dance_categories",
   "get_data_summary",
@@ -33,7 +35,7 @@ export const ALL_TOOLS = [
 ] as const;
 
 export const CORE_TOOLS = [
-  "workflow_overview",
+  "act_overview",
   "advise_setup_mode",
   "initialize_styling_session",
   "next_combo",
@@ -50,6 +52,8 @@ export const STANDARD_TOOLS = [
   "get_tal",
   "list_dances",
   "get_dance",
+  "list_acts",
+  "get_act",
   "build_prompt",
   "quick_apply",
   "build_custom_tal",
