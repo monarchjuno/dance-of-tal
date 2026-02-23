@@ -11,7 +11,7 @@ import { resolveToolSet } from "./toolset.js";
 
 const server = new McpServer({
   name: "dance-of-tal",
-  version: "0.5.7",
+  version: "0.5.8",
   description: "Tal x Dance MCP server"
 });
 
