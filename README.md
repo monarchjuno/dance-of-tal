@@ -185,6 +185,7 @@ Deploy stage notes:
 - `dot deploy --stage threads`: returns post brief
 - `dot deploy --stage threads --publish --text "..."`
   posts directly via Threads Graph API using token/userId from `.dance-of-tal/channels.json` or `.dance-of-tal/.env`
+  and automatically splits long text into a reply-chain thread (500-char segment limit per post)
 
 ## Custom Tal/Dance generation
 

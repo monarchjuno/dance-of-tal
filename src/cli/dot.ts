@@ -8,7 +8,8 @@ import { buildCustomDance, buildCustomTal, resolveUnifiedSources } from "../lib/
 import { summarizeDanceRule } from "../lib/dance-schema.js";
 import { buildOutputPrompt, buildThinkingPrompt, findDance, findTal, listDances, listTals } from "../lib/persona.js";
 import {
-  publishThreadsText,
+  publishThreadsTextChain,
+  splitThreadsText,
   type ThreadsReplyControl
 } from "../lib/stages/threads.js";
 import { getProjectChannel, listProjectChannels, removeProjectChannel, upsertProjectChannel } from "./dot-channel-config.js";
@@ -1492,10 +1493,16 @@ async function runDeploy(args: string[]) {
       styleRules: outputRules,
       writeInstruction: "Create one high-engagement Korean Threads post following these style rules."
     };
+    const previewText = (deployText ?? task).trim();
+    const previewSegments = previewText ? splitThreadsText(previewText).length : 0;
+    stageResult.publishPlan = {
+      autoThreading: true,
+      estimatedSegments: previewSegments
+    };
     stageResult.publishReady = Boolean(resolvedToken && userId);
     stageResult.nextSteps = [
       "Generate 3 post variants using `postBrief`.",
-      "Publish directly: dot deploy --stage threads --publish --text \"...\" [--user-id ...]",
+      "Publish directly: dot deploy --stage threads --publish --text \"...\" [--user-id ...] (auto-splits long text into a thread)",
       "Record reactions and feed top posts back into Tal/Dance refinement."
     ];
 
@@ -1516,7 +1523,7 @@ async function runDeploy(args: string[]) {
         throw new Error("Threads publish requires text. Set --text \"...\" or --task \"...\".");
       }
 
-      const published = await publishThreadsText({
+      const published = await publishThreadsTextChain({
         accessToken,
         userId,
         text,
@@ -1524,14 +1531,26 @@ async function runDeploy(args: string[]) {
         baseUrl: readFlag(args, "--threads-base-url") ?? resolvedMetadata.threadsBaseUrl ?? envBaseUrl,
         apiVersion: readFlag(args, "--threads-api-version") ?? envApiVersion
       });
+      const root = published.items[0];
 
       stageResult.publish = {
         enabled: true,
         userId,
-        text,
+        textLength: text.length,
+        autoThreaded: published.items.length > 1,
+        segmentCount: published.items.length,
+        rootPostId: published.rootPostId,
+        lastPostId: published.lastPostId,
         replyControl: replyControl ?? "default",
-        containerId: published.containerId,
-        postId: published.publishedId
+        containerId: root.containerId,
+        postId: root.publishedId,
+        posts: published.items.map((item) => ({
+          index: item.index,
+          length: item.text.length,
+          replyToId: item.replyToId,
+          containerId: item.containerId,
+          postId: item.publishedId
+        }))
       };
       stageResult.nextSteps = [
         "Published via Threads Graph API.",
