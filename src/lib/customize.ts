@@ -36,7 +36,7 @@ export type BuildCustomDanceInput = {
   goal?: string;
   sources: CustomSource[];
   stylePolicy?: DanceStylePolicy;
-  stage?: "generic" | "gpts" | "mcp" | "openclaw" | "threads";
+  stage?: "generic" | "gpts" | "mcp" | "openclaw" | "threads" | "my-aws-server";
   examples?: Array<string | { input?: string; output?: string; label?: string; notes?: string }>;
   stageContext?: {
     threadsAccessToken?: string;
@@ -71,10 +71,10 @@ export type UnifiedCustomInput = {
 
 const DEFAULT_STAGE = "generic" as const;
 
-const normalizeStage = (value?: string): BuildCustomDanceInput["stage"] => {
+const normalizeStage = (value?: string): Extract<BuildCustomDanceInput["stage"], string> => {
   const normalized = (value ?? DEFAULT_STAGE).trim().toLowerCase();
-  if (normalized === "gpts" || normalized === "mcp" || normalized === "openclaw" || normalized === "threads") {
-    return normalized;
+  if (normalized === "gpts" || normalized === "mcp" || normalized === "openclaw" || normalized === "threads" || normalized === "my-aws-server") {
+    return normalized as Extract<BuildCustomDanceInput["stage"], string>;
   }
   return "generic";
 };

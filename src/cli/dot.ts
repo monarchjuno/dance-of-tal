@@ -16,7 +16,7 @@ function printUsage() {
   const commandRows: Array<[string, string]> = [
     ["dot pick tal|dance [filters]", "Pick a Tal or Dance from presets/custom items"],
     ["dot lock --tal <slug> [--dance <slug>]", "Lock active Tal/Dance into current project"],
-    ["dot deploy --stage gpts|mcp|openclaw|threads", "Build channel-ready package from active Tal/Dance"],
+    ["dot deploy --stage gpts|mcp|openclaw|threads|my-aws-server", "Build channel-ready package from active Tal/Dance"],
     ["dot init [--project ...]", "Step-by-step setup wizard for .dance-of-tal config"],
     ["dot init --tal ... [--dance ...] [--name ...] [--target ...]", "Non-interactive init + optional starting combo"],
     ["dot setup ...", "Alias of dot init"],

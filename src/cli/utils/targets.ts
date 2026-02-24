@@ -1,10 +1,10 @@
 export type InitTargetHost = "windsurf" | "claude" | "openclaw" | "cursor" | "gpts" | "other";
-export type DeployStage = "gpts" | "mcp" | "openclaw" | "threads";
+export type DeployStage = "gpts" | "mcp" | "openclaw" | "threads" | "my-aws-server";
 export type InitWizardMode = "init-only" | "tal-only" | "dance-only" | "combo";
 export type InitWizardSourceType = "preset" | "custom";
 
 export const isDeployStage = (value: string): value is DeployStage => {
-    return value === "gpts" || value === "mcp" || value === "openclaw" || value === "threads";
+    return value === "gpts" || value === "mcp" || value === "openclaw" || value === "threads" || value === "my-aws-server";
 };
 
 export const resolveTargetHost = (value?: string): InitTargetHost => {

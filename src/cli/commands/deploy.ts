@@ -9,7 +9,7 @@ import { loadProjectDotEnv, readFirstEnv } from "../project-env.js";
 export async function runDeploy(args: string[]) {
     const stageRaw = readFlag(args, "--stage");
     if (!stageRaw || !isDeployStage(stageRaw)) {
-        throw new Error("Usage: dot deploy --stage gpts|mcp|openclaw|threads [--publish] ...");
+        throw new Error("Usage: dot deploy --stage gpts|mcp|openclaw|threads|my-aws-server [--publish] ...");
     }
 
     const projectDir = readProjectArg(args);
