@@ -11,7 +11,7 @@ Dance of Tal introduces true separation of concerns to language models. It treat
 1. **Tal (The Mind / Data Model):** Your analytical profile. How the AI digests problems, weighs risks, processes constraints, and deduces conclusions. (The *What* and *Why*).
 2. **Dance (The Movement / View):** Your output geometry. The tone, structural matrix, pacing, and punctuation density of the final artifact. (The *How*).
 3. **Act (The Sequence / Controller):** Your workflow logic. A deterministic, step-by-step pipeline ensuring the model doesn't skip necessary logical milestones. (The *When*).
-4. **Stage (The Arena / Environment):** Your deployment target. Are you rendering to an IDE context (MCP), an autonomous agent (OpenClaw), or publishing a micro-blog (Threads)? (The *Where*).
+4. **Stage (The Arena / Environment):** Your deployment target. Are you rendering to a custom backend (`my-aws-server`), an autonomous agent (`openclaw`), or publishing a micro-blog (`threads`)? (The *Where*).
 
 By decoupling these elements, you can mix and match behaviors per project and deploy them anywhere.
 
@@ -34,8 +34,7 @@ This guarantees that whether you are using a *Creative Writer* or a *Data Scient
 ### Stage-Aware Deployments (`Stage`)
 Once your choreography (Tal + Dance + Act) is locked, you "deploy" it to a **Stage**. Each stage compiles and packages the exact same cognitive instructions differently based on the medium's constraints:
 
-- **`--stage mcp`**: Returns a SYSTEM/USER package optimized for IDE context windows (Windsurf, Cursor, Claude Desktop).
-- **`--stage gpts`**: Consolidates instructions and tool rules to be pasted straight into the Custom GPT Builder.
+- **`--stage my-aws-server`**: Packages the choreography into a custom JSON envelope required by your proprietary backend service.
 - **`--stage openclaw`**: Returns payload fragments and system prompts optimized for intelligent agent boundaries (using MCP tools like `build_openclaw_profile`).
 - **`--stage threads`**: Formats output for micro-blogging and can **publish directly** via Graph API (`--publish`), automatically segmenting the payload into a reply chain if it exceeds 500 characters.
 
@@ -56,7 +55,7 @@ dot init --project /ABSOLUTE/PATH/TO/YOUR/PROJECT --target windsurf
 dot lock --tal strategy-chief --dance boardroom-brief --name "Founder Combo"
 
 # 3) Deploy the configuration to your stage
-dot deploy --stage mcp --task "Draft this week's board summary"
+dot deploy --stage my-aws-server --task "Draft this week's board summary"
 ```
 
 *Don't want to install globally? Just use npx:*
