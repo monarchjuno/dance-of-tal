@@ -29,15 +29,15 @@ With legacy prompting, you rewrite the whole instruction set. With Dance of Tal,
 ### Deterministic Workflows (`Act`)
 LLMs are prone to wandering. The **Act** primitive forces the LLM through a specific sequence of operations—such as [1. Analyze constraints -> 2. Draft hypotheses -> 3. Formulate response].
 
-This guarantees that whether you are using a *Creative Writer* or a *Data Scientist* Tal, the operational pipeline remains predictable and debuggable.
+This guarantees that whether you are using a *Creative Writer* or a *Data Scientist* Tal, the operational pipeline remains predictable and debuggable. Act maintains state using strictly managed step transitions within `.dance-of-tal/sessions.json`.
 
 ### Stage-Aware Deployments (`Stage`)
 Once your choreography (Tal + Dance + Act) is locked, you "deploy" it to a **Stage**. Each stage compiles and packages the exact same cognitive instructions differently based on the medium's constraints:
 
 - **`--stage mcp`**: Returns a SYSTEM/USER package optimized for IDE context windows (Windsurf, Cursor, Claude Desktop).
-- **`--stage gpts`**: Consolidates instructions to be pasted straight into the Custom GPT Builder.
-- **`--stage openclaw`**: Returns system prompts optimized for intelligent agent boundaries and tool-use.
-- **`--stage threads`**: Formats output for micro-blogging and can **publish directly** via Graph API (`--publish`), automatically segmenting the payload into a reply chain.
+- **`--stage gpts`**: Consolidates instructions and tool rules to be pasted straight into the Custom GPT Builder.
+- **`--stage openclaw`**: Returns payload fragments and system prompts optimized for intelligent agent boundaries (using MCP tools like `build_openclaw_profile`).
+- **`--stage threads`**: Formats output for micro-blogging and can **publish directly** via Graph API (`--publish`), automatically segmenting the payload into a reply chain if it exceeds 500 characters.
 
 ---
 
@@ -97,12 +97,15 @@ dot deploy --stage threads --publish --text "Launching the private beta now. Her
 ## Under the Hood
 
 ### Data Storage & Portability
-- Predefined behaviors live within the package catalog.
-- Your actual usage, custom generations, and active configurations live entirely within your codebase in `.dance-of-tal/`.
+- Predefined behaviors live within the package catalog (`src/data/`).
+- Your actual usage, custom generations, active configurations, and API credentials live entirely within your codebase in `.dance-of-tal/`.
+  - `.dance-of-tal/config.json`: Stores your Tals, Dances, and saved Combos.
+  - `.dance-of-tal/sessions.json`: Holds stateful Act session histories.
+  - `.dance-of-tal/channels.json`: Encrypted/local API keys (like Threads variables).
 - **No central server tracks your prompts.** It is completely local. Check it into git, version it, and share it with your team.
 
-### MCP Integration (stdio)
-Dance of Tal acts as a standalone tool provider for your AI code editor. To integrate into Claude Desktop or standard MCP clients, simply inject the engine:
+### Extensible MCP Integration (stdio)
+Dance of Tal acts as a standalone tool provider for your AI code editor. To integrate into Claude Desktop or standard MCP clients, simply inject the engine.
 
 ```json
 {
@@ -111,12 +114,19 @@ Dance of Tal acts as a standalone tool provider for your AI code editor. To inte
       "command": "npx",
       "args": ["-y", "dance-of-tal"],
       "env": {
-        "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
+        "DANCE_OF_TAL_PROJECT_DIR": "/ABSOLUTE/PATH/TO/YOUR/PROJECT",
+        "DANCE_OF_TAL_TOOLS": "core" // Access mode: "core", "standard", or "all"
       }
     }
   }
 }
 ```
+
+#### Supported MCP Tool Namespaces
+- `act`: Session lifecycle management (`run_active_combo`, `get_session`, `clear_session`)
+- `catalog`: Discovery mapping (`list_tals`, `list_acts`, `get_recommended_combos`)
+- `custom`: Abstracting logic from raw text or URLs (`build_custom_tal_dance`, `update_combo`)
+- `gpts`: Fast export to custom GPT builder (`get_gpts_bootstrap`)
 
 ---
 
