@@ -1,3 +1,12 @@
+> [!WARNING]
+> **⚠️ This repository has been moved / 이 레포지토리는 이전되었습니다**
+>
+> This project is no longer maintained here. All future development, updates, and issues are tracked in the new official repository.
+>
+> 👉 **New repository:** [dance-of-tal/dance-of-tal](https://github.com/dance-of-tal/dance-of-tal)
+>
+> Please update your bookmarks, stars, and any references accordingly.
+
 # Dance of Tal
 
 > *"We don't just speak to the machine; we choreograph its mind."*
