@@ -1,5 +1,5 @@
 > [!WARNING]
-> **⚠️ This repository has been moved / 이 레포지토리는 이전되었습니다**
+> **⚠️ This repository has been moved 
 >
 > This project is no longer maintained here. All future development, updates, and issues are tracked in the new official repository.
 >
